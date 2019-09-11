@@ -1,0 +1,7 @@
+FROM openjdk:12-alpine AS builder
+COPY . /app
+RUN ls /app/
+WORKDIR /app
+RUN ./gradlew clean build
+
+
