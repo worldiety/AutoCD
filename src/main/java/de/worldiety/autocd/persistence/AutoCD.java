@@ -10,7 +10,20 @@ public class AutoCD {
     private String volumeMount;
     private String registryImagePath;
     private String subdomain;
+    private boolean shouldHost = true;
     private Map<String, String> environmentVariables;
+
+    @Contract(pure = true)
+    public AutoCD(int containerPort, int servicePort, String imagePath, String volumeMount, String registryImagePath, String subdomain, boolean shouldHost, Map<String, String> environmentVariables) {
+        this.containerPort = containerPort;
+        this.servicePort = servicePort;
+        this.imagePath = imagePath;
+        this.volumeMount = volumeMount;
+        this.registryImagePath = registryImagePath;
+        this.subdomain = subdomain;
+        this.shouldHost = shouldHost;
+        this.environmentVariables = environmentVariables;
+    }
 
     @Contract(pure = true)
     public AutoCD(int containerPort, String imagePath, String volumeMount) {
@@ -21,6 +34,14 @@ public class AutoCD {
 
     @Contract(pure = true)
     public AutoCD() {
+    }
+
+    public boolean isShouldHost() {
+        return shouldHost;
+    }
+
+    public void setShouldHost(boolean shouldHost) {
+        this.shouldHost = shouldHost;
     }
 
     public Map<String, String> getEnvironmentVariables() {

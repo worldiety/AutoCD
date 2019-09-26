@@ -1,4 +1,4 @@
-package de.worldiety.autocd.persistence;
+package de.worldiety.autocd.docker;
 
 import de.worldiety.autocd.util.FileType;
 import java.io.File;
@@ -14,11 +14,11 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-public class FileFinder {
+public class DockerfileHandler {
     private List<File> fileList = new ArrayList<>();
     private FileType type;
 
-    public FileFinder(String path) {
+    public DockerfileHandler(String path) {
         prepFileList(path);
     }
 

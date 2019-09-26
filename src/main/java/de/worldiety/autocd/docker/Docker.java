@@ -1,7 +1,6 @@
-package de.worldiety.autocd.persistence;
+package de.worldiety.autocd.docker;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.BuildResponseItem;
 import com.github.dockerjava.api.model.PushResponseItem;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -37,7 +36,7 @@ public class Docker {
         client = DockerClientBuilder.getInstance(config).build();
     }
 
-    public void buildImageFromFile(File configFile) {
+    public String buildAndPushImageFromFile(File configFile) {
         var reg = System.getenv(Environment.CI_REGISTRY.toString());
         var projectName = System.getenv(Environment.CI_PROJECT_NAME.toString());
         var nameSpace = System.getenv(Environment.CI_PROJECT_NAMESPACE.toString());
@@ -53,8 +52,8 @@ public class Docker {
         BuildImageResultCallback callback = new BuildImageResultCallback() {
             @Override
             public void onNext(@NotNull BuildResponseItem item) {
-                if (item.getStream() != null) {
-                    System.out.println("" + item.getStream());
+                if (item.getStream() != null && ! item.getStream().equals(".")) {
+                    log.info(item.getStream());
                 }
                 super.onNext(item);
             }
@@ -69,8 +68,8 @@ public class Docker {
             client.pushImageCmd(tag).exec(new PushImageResultCallback() {
                 @Override
                 public void onNext(PushResponseItem item) {
-                    if (item.getStream() != null) {
-                        System.out.println("" + item.getStream());
+                    if (item.getStream() != null && ! item.getStream().equals(".")) {
+                        log.info(item.getStream());
                     }
                     super.onNext(item);
                 }
@@ -78,9 +77,7 @@ public class Docker {
         } catch (InterruptedException e) {
             log.error("pushing image failed", e);
         }
-    }
 
-    public void creatContainerFromImage(String imageName) {
-        CreateContainerResponse container = client.createContainerCmd(imageName).exec();
+        return tag;
     }
 }

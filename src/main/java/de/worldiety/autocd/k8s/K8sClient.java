@@ -1,5 +1,7 @@
 package de.worldiety.autocd.k8s;
 
+import static de.worldiety.autocd.util.Util.isLocal;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import de.worldiety.autocd.persistence.AutoCD;
@@ -52,7 +54,7 @@ public class K8sClient {
             api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             log.warn("Could not delete namespace", e);
-        } catch (com.google.gson.JsonSyntaxException e) {
+        } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
     }
@@ -63,7 +65,7 @@ public class K8sClient {
             extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             log.warn("Could not delete deployment", e);
-        } catch (com.google.gson.JsonSyntaxException e) {
+        } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
     }
@@ -73,7 +75,7 @@ public class K8sClient {
             api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, null);
         } catch (ApiException e) {
             log.warn("Could not delete service", e);
-        } catch (com.google.gson.JsonSyntaxException e) {
+        } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
     }
@@ -84,7 +86,7 @@ public class K8sClient {
             extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, null);
         } catch (ApiException e) {
             log.error("Could not delete ingress", e);
-        } catch (com.google.gson.JsonSyntaxException e) {
+        } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
     }
@@ -92,6 +94,7 @@ public class K8sClient {
 
     /**
      * https://github.com/kubernetes-client/java/issues/86
+     *
      * @param ignored ignored
      */
     private void ignoreGoogleParsingError(JsonSyntaxException ignored) {
@@ -106,7 +109,6 @@ public class K8sClient {
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
         var nameSpace = getNamespace();
-        deleteNamespace(nameSpace);
 
         createNamespace(nameSpace);
         createDeployment(deployment);
@@ -131,27 +133,31 @@ public class K8sClient {
         api.createNamespacedService(service.getMetadata().getNamespace(), service, false, "true", null);
     }
 
-    private void createDeployment(ExtensionsV1beta1Deployment deployment) throws ApiException {
+    private void createDeployment(ExtensionsV1beta1Deployment deployment) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
-        extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
+        try {
+            extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
+        } catch (ApiException e) {
+            if (e.getMessage().equals("Conflict")) {
+                var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
+                if (resp.getMessage().startsWith("object is being deleted")) {
+                    try {
+                        log.info("Deployment is still being deleted, retrying...");
+                        Thread.sleep(4000);
+                        createDeployment(deployment);
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        }
     }
 
     private void createNamespace(V1Namespace nameSpace) {
         try {
             api.createNamespace(nameSpace, false, "true", null);
         } catch (ApiException e) {
-            if (e.getMessage().equals("Conflict")) {
-                var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
-                if (resp.getMessage().startsWith("object is being deleted")) {
-                    try {
-                        log.info("Namespace is still being deleted, retrying...");
-                        Thread.sleep(4000);
-                        createNamespace(nameSpace);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
+            log.info("Namespace exists", e);
         }
     }
 
@@ -268,10 +274,6 @@ public class K8sClient {
         return System.getenv(Environment.CI_PROJECT_NAME.toString());
     }
 
-    private boolean isLocal() {
-        var reg = System.getenv(Environment.CI_REGISTRY.toString());
-        return reg == null;
-    }
 
     @NotNull
     private V1ObjectMeta getNamespacedMeta() {
@@ -298,5 +300,14 @@ public class K8sClient {
 
         ns.setMetadata(metadata);
         return ns;
+    }
+
+    public void removeFromK8s(AutoCD autoCD) {
+        var ingress = getIngress(autoCD);
+        deleteIngress(ingress);
+        var service = getService(autoCD);
+        deleteService(service);
+        var deployment = getDeployment(autoCD);
+        deleteDeployment(deployment);
     }
 }
