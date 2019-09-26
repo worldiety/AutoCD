@@ -2,14 +2,10 @@ package de.worldiety.autocd;
 
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.persistence.FileFinder;
-import de.worldiety.autocd.util.Environment;
-import de.worldiety.autocd.util.FileType;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.Configuration;
 import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.models.V1Pod;
-import io.kubernetes.client.models.V1PodList;
 import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.KubeConfig;
 import java.io.FileReader;
@@ -37,16 +33,8 @@ public class Main {
         try {
             k8sClient.deployToK8s(autocd);
         } catch (ApiException e) {
-            log.warn(e.getResponseBody());
+            log.warn("not caught " + e);
         }
-
-        //var docker = new Docker();
-        /*
-        finder.findDockerConfig().ifPresent(configFile -> {
-            docker.buildImageFromFile(configFile);
-
-        });
-        */
     }
 }
 

@@ -11,6 +11,7 @@ import com.github.dockerjava.core.command.PushImageResultCallback;
 import de.worldiety.autocd.util.Environment;
 import java.io.File;
 import java.util.Set;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,7 @@ public class Docker {
 
         BuildImageResultCallback callback = new BuildImageResultCallback() {
             @Override
-            public void onNext(BuildResponseItem item) {
+            public void onNext(@NotNull BuildResponseItem item) {
                 if (item.getStream() != null) {
                     System.out.println("" + item.getStream());
                 }

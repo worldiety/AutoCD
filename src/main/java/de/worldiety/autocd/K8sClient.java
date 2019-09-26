@@ -1,9 +1,10 @@
 package de.worldiety.autocd;
 
+import com.google.gson.Gson;
 import de.worldiety.autocd.persistence.AutoCD;
+import de.worldiety.autocd.persistence.KubeStatusResponse;
 import de.worldiety.autocd.util.Environment;
 import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
@@ -34,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class K8sClient {
-    //TODO: Wait for namespace to be deleted if it still contains pods
     private static final Logger log = LoggerFactory.getLogger(K8sClient.class);
     private final CoreV1Api api;
 
@@ -48,7 +48,6 @@ public class K8sClient {
     }
 
     private void deleteNamespace(@NotNull V1Namespace namespace) {
-        AppsV1Api apiInstance = new AppsV1Api();
         try {
             api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, null);
         } catch (ApiException e) {
@@ -59,8 +58,7 @@ public class K8sClient {
     }
 
     private void deleteDeployment(@NotNull ExtensionsV1beta1Deployment deployment) {
-        var extensionsV1beta1Api = new ExtensionsV1beta1Api();
-        extensionsV1beta1Api.setApiClient(api.getApiClient());
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, null);
         } catch (ApiException e) {
@@ -81,8 +79,7 @@ public class K8sClient {
     }
 
     private void deleteIngress(@NotNull V1beta1Ingress ingress) {
-        var extensionsV1beta1Api = new ExtensionsV1beta1Api();
-        extensionsV1beta1Api.setApiClient(api.getApiClient());
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, null);
         } catch (ApiException e) {
@@ -102,16 +99,51 @@ public class K8sClient {
         var nameSpace = getNamespace();
         deleteNamespace(nameSpace);
 
-        AppsV1Api apiInstance = new AppsV1Api();
-        var extensionsV1beta1Api = new ExtensionsV1beta1Api();
-        var appsV1Api = new AppsV1Api();
-        extensionsV1beta1Api.setApiClient(api.getApiClient());
-        appsV1Api.setApiClient(api.getApiClient());
-        apiInstance.setApiClient(api.getApiClient());
-        api.createNamespace(nameSpace, false, "true", null);
-        extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
-        api.createNamespacedService(service.getMetadata().getNamespace(), service, false, "true", null);
+        createNamespace(nameSpace);
+        createDeployment(deployment);
+        createService(service);
+        createIngress(ingress);
+    }
+
+    private void createIngress(V1beta1Ingress ingress) throws ApiException {
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         extensionsV1beta1Api.createNamespacedIngress(ingress.getMetadata().getNamespace(), ingress, false, "true", null);
+    }
+
+    @NotNull
+    private ExtensionsV1beta1Api getExtensionsV1beta1Api() {
+        var extensionsV1beta1Api = new ExtensionsV1beta1Api();
+        extensionsV1beta1Api.setApiClient(api.getApiClient());
+        return extensionsV1beta1Api;
+    }
+
+
+    private void createService(V1Service service) throws ApiException {
+        api.createNamespacedService(service.getMetadata().getNamespace(), service, false, "true", null);
+    }
+
+    private void createDeployment(ExtensionsV1beta1Deployment deployment) throws ApiException {
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+        extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
+    }
+
+    private void createNamespace(V1Namespace nameSpace) {
+        try {
+            api.createNamespace(nameSpace, false, "true", null);
+        } catch (ApiException e) {
+            if (e.getMessage().equals("Conflict")) {
+                var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
+                if (resp.getMessage().startsWith("object is being deleted")) {
+                    try {
+                        log.info("Namespace is still being deleted, retrying...");
+                        Thread.sleep(4000);
+                        createNamespace(nameSpace);
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        }
     }
 
     @NotNull
