@@ -6,7 +6,8 @@ import org.jetbrains.annotations.Contract;
 public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
-    private String imagePath;
+    private boolean publiclyAccessible = true;
+    private String dockerImagePath;
     private String volumeMount;
     private String registryImagePath;
     private String subdomain;
@@ -14,10 +15,11 @@ public class AutoCD {
     private Map<String, String> environmentVariables;
 
     @Contract(pure = true)
-    public AutoCD(int containerPort, int servicePort, String imagePath, String volumeMount, String registryImagePath, String subdomain, boolean shouldHost, Map<String, String> environmentVariables) {
+    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, String dockerImagePath, String volumeMount, String registryImagePath, String subdomain, boolean shouldHost, Map<String, String> environmentVariables) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
-        this.imagePath = imagePath;
+        this.publiclyAccessible = publiclyAccessible;
+        this.dockerImagePath = dockerImagePath;
         this.volumeMount = volumeMount;
         this.registryImagePath = registryImagePath;
         this.subdomain = subdomain;
@@ -26,14 +28,15 @@ public class AutoCD {
     }
 
     @Contract(pure = true)
-    public AutoCD(int containerPort, String imagePath, String volumeMount) {
-        this.containerPort = containerPort;
-        this.imagePath = imagePath;
-        this.volumeMount = volumeMount;
+    public AutoCD() {
     }
 
-    @Contract(pure = true)
-    public AutoCD() {
+    public boolean isPubliclyAccessible() {
+        return publiclyAccessible;
+    }
+
+    public void setPubliclyAccessible(boolean publiclyAccessible) {
+        this.publiclyAccessible = publiclyAccessible;
     }
 
     public boolean isShouldHost() {
@@ -84,12 +87,12 @@ public class AutoCD {
         this.containerPort = containerPort;
     }
 
-    public String getImagePath() {
-        return imagePath;
+    public String getDockerImagePath() {
+        return dockerImagePath;
     }
 
-    public void setImagePath(String imagePath) {
-        this.imagePath = imagePath;
+    public void setDockerImagePath(String dockerImagePath) {
+        this.dockerImagePath = dockerImagePath;
     }
 
     public String getVolumeMount() {
