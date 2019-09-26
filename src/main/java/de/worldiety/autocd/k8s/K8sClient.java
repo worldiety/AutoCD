@@ -4,8 +4,10 @@ import static de.worldiety.autocd.util.Util.isLocal;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.util.Environment;
+import de.worldiety.autocd.util.FileType;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
@@ -40,10 +42,12 @@ import org.slf4j.LoggerFactory;
 public class K8sClient {
     private static final Logger log = LoggerFactory.getLogger(K8sClient.class);
     private final CoreV1Api api;
+    private final DockerfileHandler finder;
 
     @Contract(pure = true)
-    public K8sClient(CoreV1Api api) {
+    public K8sClient(CoreV1Api api, DockerfileHandler finder) {
         this.api = api;
+        this.finder = finder;
     }
 
     private static Void apply(ExtensionsV1beta1Deployment deployment1) {
@@ -179,7 +183,7 @@ public class K8sClient {
         var ingress = new V1beta1Ingress();
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
-        meta.setName(getNamespaceString() + "-ingress");
+        meta.setName(getNamespaceString() + "-" + getName() + "-ingress");
 
         var spec = new V1beta1IngressSpecBuilder()
                 .withRules(new V1beta1IngressRuleBuilder()
@@ -187,7 +191,7 @@ public class K8sClient {
                         .withHttp(new V1beta1HTTPIngressRuleValueBuilder()
                                 .withPaths(new V1beta1HTTPIngressPathBuilder().withPath("/")
                                         .withBackend(new V1beta1IngressBackendBuilder()
-                                                .withServiceName(getNamespaceString() + "-service")
+                                                .withServiceName(getNamespaceString() + "-" + getName() + "-service")
                                                 .withServicePort(new IntOrString(autoCD.getServicePort()))
                                                 .build())
                                         .build())
@@ -206,13 +210,13 @@ public class K8sClient {
         var service = new V1Service();
         service.setKind("Service");
         var meta = getNamespacedMeta();
-        meta.setName(getNamespaceString() + "-service");
+        meta.setName(getNamespaceString() + "-" + getName() + "-service");
 
         var spec = new V1ServiceSpec();
-        spec.setSelector(Map.of("k8s-app", getNamespaceString()));
+        spec.setSelector(Map.of("k8s-app", getK8sApp()));
         var port = new V1ServicePort();
         port.setName("web");
-        port.setPort(80);
+        port.setPort(autoCD.getServicePort());
         port.setTargetPort(new IntOrString(autoCD.getContainerPort()));
         spec.setPorts(List.of(port));
 
@@ -222,11 +226,15 @@ public class K8sClient {
         return service;
     }
 
+    private String getK8sApp() {
+        return getNamespaceString() + "-" + getName();
+    }
+
     @NotNull
     private ExtensionsV1beta1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
         meta.setName(getNamespaceString());
-        var labels = Map.of("k8s-app", getNamespaceString());
+        var labels = Map.of("k8s-app", getK8sApp());
         meta.setLabels(labels);
 
         var spec = new ExtensionsV1beta1DeploymentSpec();
@@ -241,16 +249,22 @@ public class K8sClient {
         template.setMetadata(templateMeta);
 
         templateMeta.setLabels(Map.of(
-                "k8s-app", getNamespaceString(),
+                "k8s-app", getK8sApp(),
                 "name", getName()));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
         template.setSpec(podSpec);
 
-        podSpec.setTerminationGracePeriodSeconds(60L);
+        podSpec.setTerminationGracePeriodSeconds(autoCD.getTerminationGracePeriod());
         var port = new V1ContainerPort();
-        port.setContainerPort(8080);
+
+        if (finder.getFileType().equals(FileType.VUE)) {
+            port.setContainerPort(autoCD.getContainerPort());
+        } else {
+            port.setContainerPort(autoCD.getContainerPort());
+        }
+
         port.setName("http");
 
         var container = new V1ContainerBuilder()
@@ -337,8 +351,14 @@ public class K8sClient {
                     ex.printStackTrace();
                 }
             }
+
+            if (resp.getMessage().contains("already exists")) {
+                return;
+            }
         }
 
+
         log.error("Unknown error", e);
+        log.info(e.getResponseBody());
     }
 }

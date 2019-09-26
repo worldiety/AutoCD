@@ -84,6 +84,14 @@ public class DockerfileHandler {
         this.type = type;
     }
 
+    public FileType getFileType() {
+        return fileList.stream()
+                .map(this::getFileExt)
+                .map(this::mapFileTypeToFileType)
+                .filter(it -> it.getDockerConfig() != null)
+                .findFirst().orElse(FileType.OTHER);
+    }
+
     public Optional<File> findDockerConfig() {
         var opt = fileList.stream()
                 .map(this::getFileExt)
@@ -101,7 +109,7 @@ public class DockerfileHandler {
                 IOUtils.copy(getFileFromResources(ftype.getDockerConfig()), fout);
                 fout.flush();
 
-                if (ftype.equals(FileType.JAVA)) {
+                if (ftype.equals(FileType.JAVA) || ftype.equals(FileType.VUE)) {
                     IOUtils.copy(getFileFromResources(ftype.getFinalDocker()), fout);
                     fout.flush();
                 }

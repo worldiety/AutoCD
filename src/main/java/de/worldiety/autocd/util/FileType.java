@@ -3,7 +3,7 @@ package de.worldiety.autocd.util;
 import org.jetbrains.annotations.Contract;
 
 public enum FileType {
-    JAVA("java", "openjdk-12-docker", "spring-12-docker"), GO("go", "go-docker"), VUE("vue", "vue-docker"), OTHER("other");
+    JAVA("java", "openjdk-12-docker", "spring-12-docker"), GO("go", "go-docker"), VUE("vue", "vue-builder-docker", "vue-prod-docker"), OTHER("other");
 
     private final String name;
     private String dockerConfig;

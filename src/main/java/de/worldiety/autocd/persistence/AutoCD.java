@@ -7,6 +7,7 @@ public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
     private boolean publiclyAccessible = true;
+    private long terminationGracePeriod = 60L;
     private String dockerImagePath;
     private String volumeMount;
     private String registryImagePath;
@@ -29,6 +30,14 @@ public class AutoCD {
 
     @Contract(pure = true)
     public AutoCD() {
+    }
+
+    public long getTerminationGracePeriod() {
+        return terminationGracePeriod;
+    }
+
+    public void setTerminationGracePeriod(long terminationGracePeriod) {
+        this.terminationGracePeriod = terminationGracePeriod;
     }
 
     public boolean isPubliclyAccessible() {

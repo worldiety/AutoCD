@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.k8s.K8sClient;
 import de.worldiety.autocd.persistence.AutoCD;
+import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
@@ -58,8 +59,12 @@ public class Main {
             autoCD.setSubdomain(Util.buildSubdomain());
         }
 
+        if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
+            autoCD.setContainerPort(80);
+        }
+
         CoreV1Api api = new CoreV1Api();
-        var k8sClient = new K8sClient(api);
+        var k8sClient = new K8sClient(api, finder);
         if (!autoCD.isShouldHost()) {
             k8sClient.removeFromK8s(autoCD);
             log.info("Service is being removed from k8s.");
