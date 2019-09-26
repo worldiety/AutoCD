@@ -1,8 +1,8 @@
-package de.worldiety.autocd;
+package de.worldiety.autocd.k8s;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import de.worldiety.autocd.persistence.AutoCD;
-import de.worldiety.autocd.persistence.KubeStatusResponse;
 import de.worldiety.autocd.util.Environment;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -53,7 +53,7 @@ public class K8sClient {
         } catch (ApiException e) {
             log.warn("Could not delete namespace", e);
         } catch (com.google.gson.JsonSyntaxException e) {
-            log.info("google why");
+            ignoreGoogleParsingError(e);
         }
     }
 
@@ -64,7 +64,7 @@ public class K8sClient {
         } catch (ApiException e) {
             log.warn("Could not delete deployment", e);
         } catch (com.google.gson.JsonSyntaxException e) {
-            log.info("google why");
+            ignoreGoogleParsingError(e);
         }
     }
 
@@ -74,7 +74,7 @@ public class K8sClient {
         } catch (ApiException e) {
             log.warn("Could not delete service", e);
         } catch (com.google.gson.JsonSyntaxException e) {
-            log.info("google why");
+            ignoreGoogleParsingError(e);
         }
     }
 
@@ -85,8 +85,17 @@ public class K8sClient {
         } catch (ApiException e) {
             log.error("Could not delete ingress", e);
         } catch (com.google.gson.JsonSyntaxException e) {
-            log.info("google why");
+            ignoreGoogleParsingError(e);
         }
+    }
+
+
+    /**
+     * https://github.com/kubernetes-client/java/issues/86
+     * @param ignored ignored
+     */
+    private void ignoreGoogleParsingError(JsonSyntaxException ignored) {
+        //No-op
     }
 
     private void deploy(AutoCD autoCD) throws ApiException {

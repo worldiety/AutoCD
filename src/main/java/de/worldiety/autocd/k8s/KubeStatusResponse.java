@@ -1,4 +1,4 @@
-package de.worldiety.autocd.persistence;
+package de.worldiety.autocd.k8s;
 
 import com.google.gson.annotations.SerializedName;
 

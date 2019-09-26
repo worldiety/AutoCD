@@ -1,5 +1,6 @@
 package de.worldiety.autocd;
 
+import de.worldiety.autocd.k8s.K8sClient;
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.persistence.FileFinder;
 import io.kubernetes.client.ApiClient;
