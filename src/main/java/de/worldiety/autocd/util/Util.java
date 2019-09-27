@@ -12,7 +12,7 @@ public class Util {
             return "local-test" + CLOUDIETY_DOMAIN;
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + "." + System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()) + CLOUDIETY_DOMAIN;
+        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + "-" + System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()) + CLOUDIETY_DOMAIN;
     }
 
 

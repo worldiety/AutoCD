@@ -1,3 +1,5 @@
 FROM openjdk:8-alpine
-COPY . /usr/src/myapp
-WORKDIR /usr/src/myapp
+COPY . /app
+RUN ls /app/
+WORKDIR /app
+RUN ./gradlew clean build

@@ -1,5 +1,7 @@
 package de.worldiety.autocd.persistence;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.jetbrains.annotations.Contract;
 
@@ -9,27 +11,65 @@ public class AutoCD {
     private boolean publiclyAccessible = true;
     private long terminationGracePeriod = 60L;
     private String dockerImagePath;
-    private String volumeMount;
     private String registryImagePath;
     private String subdomain;
     private boolean shouldHost = true;
+    private String command;
+    private List<Volume> volumes = new ArrayList<>();
     private Map<String, String> environmentVariables;
+    private List<AutoCD> otherImages = new ArrayList<>();
+    private List<String> args = new ArrayList<>();
 
-    @Contract(pure = true)
-    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, String dockerImagePath, String volumeMount, String registryImagePath, String subdomain, boolean shouldHost, Map<String, String> environmentVariables) {
+    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, String command, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.publiclyAccessible = publiclyAccessible;
+        this.terminationGracePeriod = terminationGracePeriod;
         this.dockerImagePath = dockerImagePath;
-        this.volumeMount = volumeMount;
         this.registryImagePath = registryImagePath;
         this.subdomain = subdomain;
         this.shouldHost = shouldHost;
+        this.command = command;
+        this.volumes = volumes;
         this.environmentVariables = environmentVariables;
+        this.otherImages = otherImages;
+        this.args = args;
     }
 
     @Contract(pure = true)
     public AutoCD() {
+    }
+
+    public String getCommand() {
+        return command;
+    }
+
+    public void setCommand(String command) {
+        this.command = command;
+    }
+
+    public List<String> getArgs() {
+        return args;
+    }
+
+    public void setArgs(List<String> args) {
+        this.args = args;
+    }
+
+    public List<AutoCD> getOtherImages() {
+        return otherImages;
+    }
+
+    public void setOtherImages(List<AutoCD> otherImages) {
+        this.otherImages = otherImages;
+    }
+
+    public List<Volume> getVolumes() {
+        return volumes;
+    }
+
+    public void setVolumes(List<Volume> volumes) {
+        this.volumes = volumes;
     }
 
     public long getTerminationGracePeriod() {
@@ -102,13 +142,5 @@ public class AutoCD {
 
     public void setDockerImagePath(String dockerImagePath) {
         this.dockerImagePath = dockerImagePath;
-    }
-
-    public String getVolumeMount() {
-        return volumeMount;
-    }
-
-    public void setVolumeMount(String volumeMount) {
-        this.volumeMount = volumeMount;
     }
 }

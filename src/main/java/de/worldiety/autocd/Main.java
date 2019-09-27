@@ -26,6 +26,7 @@ public class Main {
         DockerfileHandler finder = new DockerfileHandler(".");
         ApiClient client;
 
+        //TODO: configurable
         if (Util.isLocal()) {
             client = Config.fromConfig(KubeConfig.loadKubeConfig(new FileReader("/Users/lgrahmann/Downloads/kuberniety-kubeconfig.yaml")));
         } else {
@@ -66,9 +67,17 @@ public class Main {
         CoreV1Api api = new CoreV1Api();
         var k8sClient = new K8sClient(api, finder);
         if (!autoCD.isShouldHost()) {
+            if (!autoCD.getOtherImages().isEmpty()) {
+                autoCD.getOtherImages().forEach(k8sClient::removeFromK8s);
+            }
+
             k8sClient.removeFromK8s(autoCD);
             log.info("Service is being removed from k8s.");
             return;
+        }
+
+        if (!autoCD.getOtherImages().isEmpty()) {
+            autoCD.getOtherImages().forEach(k8sClient::deployToK8s);
         }
 
         k8sClient.deployToK8s(autoCD);

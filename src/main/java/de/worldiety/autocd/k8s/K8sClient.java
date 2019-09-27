@@ -6,34 +6,49 @@ import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.persistence.AutoCD;
+import de.worldiety.autocd.persistence.Volume;
 import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.ExtensionsV1beta1Deployment;
 import io.kubernetes.client.models.ExtensionsV1beta1DeploymentSpec;
+import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
 import io.kubernetes.client.models.V1ContainerPort;
 import io.kubernetes.client.models.V1LabelSelector;
 import io.kubernetes.client.models.V1LocalObjectReference;
 import io.kubernetes.client.models.V1Namespace;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.models.V1PersistentVolumeClaim;
+import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
+import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
 import io.kubernetes.client.models.V1PodSpec;
 import io.kubernetes.client.models.V1PodTemplateSpec;
+import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
 import io.kubernetes.client.models.V1Service;
 import io.kubernetes.client.models.V1ServicePort;
 import io.kubernetes.client.models.V1ServiceSpec;
+import io.kubernetes.client.models.V1Volume;
+import io.kubernetes.client.models.V1VolumeMount;
+import io.kubernetes.client.models.V1VolumeMountBuilder;
 import io.kubernetes.client.models.V1beta1HTTPIngressPathBuilder;
 import io.kubernetes.client.models.V1beta1HTTPIngressRuleValueBuilder;
 import io.kubernetes.client.models.V1beta1Ingress;
 import io.kubernetes.client.models.V1beta1IngressBackendBuilder;
 import io.kubernetes.client.models.V1beta1IngressRuleBuilder;
 import io.kubernetes.client.models.V1beta1IngressSpecBuilder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -50,6 +65,18 @@ public class K8sClient {
         this.finder = finder;
     }
 
+    private static String bytesToHex(byte[] hash) {
+        StringBuffer hexString = new StringBuffer();
+        for (int i = 0; i < hash.length; i++) {
+            String hex = Integer.toHexString(0xff & hash[i]);
+            if (hex.length() == 1) {
+                hexString.append('0');
+            }
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
     public void deployToK8s(AutoCD autoCD) {
         deploy(autoCD);
     }
@@ -60,6 +87,34 @@ public class K8sClient {
             api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             log.warn("Could not delete namespace", e);
+        } catch (JsonSyntaxException e) {
+            ignoreGoogleParsingError(e);
+        }
+    }
+
+    private void createClaims(@NotNull List<V1PersistentVolumeClaim> claims) {
+        claims.forEach(this::applyClaim);
+    }
+
+    private void deleteClaims(@NotNull List<V1PersistentVolumeClaim> claims) {
+        claims.forEach(this::applyDeleteClaim);
+    }
+
+    private void applyDeleteClaim(V1PersistentVolumeClaim claim) {
+        try {
+            api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, null);
+        } catch (ApiException e) {
+            retry(claim, this::applyDeleteClaim, e);
+        } catch (JsonSyntaxException e) {
+            ignoreGoogleParsingError(e);
+        }
+    }
+
+    private void applyClaim(V1PersistentVolumeClaim claim) {
+        try {
+            api.createNamespacedPersistentVolumeClaim(claim.getMetadata().getNamespace(), claim, null, null, null);
+        } catch (ApiException e) {
+            retry(claim, this::applyClaim, e);
         } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
@@ -97,7 +152,6 @@ public class K8sClient {
         }
     }
 
-
     /**
      * https://github.com/kubernetes-client/java/issues/86
      *
@@ -115,9 +169,12 @@ public class K8sClient {
         deleteService(service);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
+        var claims = getPersistentVolumeClaims(autoCD);
+        deleteClaims(claims);
         var nameSpace = getNamespace();
 
         createNamespace(nameSpace);
+        createClaims(claims);
         createDeployment(deployment);
         createService(service);
 
@@ -141,7 +198,6 @@ public class K8sClient {
         extensionsV1beta1Api.setApiClient(api.getApiClient());
         return extensionsV1beta1Api;
     }
-
 
     private void createService(V1Service service) {
         try {
@@ -174,12 +230,64 @@ public class K8sClient {
 
     }
 
+    private String getPVCName(Volume volume, AutoCD autoCD) {
+        var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
+        return hash(str).substring(0, 20);
+    }
+
+    private String hash(String toHash) {
+        MessageDigest digest = null;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        byte[] encodedhash = digest.digest(
+                toHash.getBytes(StandardCharsets.UTF_8));
+
+        return bytesToHex(encodedhash);
+    }
+
+    private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(AutoCD autoCD) {
+        return autoCD.getVolumes().stream().map(volume -> {
+            var pvc = new V1PersistentVolumeClaim();
+            pvc.setKind("PersistentVolumeClaim");
+            var meta = getNamespacedMeta();
+            meta.setName(getPVCName(volume, autoCD));
+            pvc.setMetadata(meta);
+            var spec = new V1PersistentVolumeClaimSpecBuilder()
+                    .withAccessModes("ReadWriteOnce")
+                    .withResources(new V1ResourceRequirementsBuilder()
+                            .withRequests(Map.of("storage", new Quantity(volume.getVolumeSize())))
+                            .build())
+                    .withStorageClassName("do-block-storage")
+                    .build();
+
+            pvc.setSpec(spec);
+
+            return pvc;
+        }).collect(Collectors.toList());
+    }
+
     @NotNull
     private V1beta1Ingress getIngress(@NotNull AutoCD autoCD) {
         var ingress = new V1beta1Ingress();
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
         meta.setName(getNamespaceString() + "-" + getName() + "-ingress");
+
+        /*ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+        try {
+            var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null, null);
+            var contained = ingresses.getItems()
+                    .stream()
+                    .filter(it -> !it.getMetadata().getNamespace().equals(meta.getNamespace()))
+                    .anyMatch(it ->
+                            it.getSpec().getRules().stream()
+                                    .anyMatch(rule -> rule.getHost().equals(autoCD.getSubdomain())));
+        } catch (ApiException e) {
+            e.printStackTrace();
+        }*/
 
         var spec = new V1beta1IngressSpecBuilder()
                 .withRules(new V1beta1IngressRuleBuilder()
@@ -253,6 +361,19 @@ public class K8sClient {
         template.setSpec(podSpec);
 
         podSpec.setTerminationGracePeriodSeconds(autoCD.getTerminationGracePeriod());
+
+        if (!autoCD.getVolumes().isEmpty()) {
+            podSpec.setVolumes(autoCD.getVolumes().stream().map(volume -> {
+                var vol = new V1Volume();
+                vol.setName(getPVCName(volume, autoCD));
+                var source = new V1PersistentVolumeClaimVolumeSource();
+                source.setClaimName(getPVCName(volume, autoCD));
+                vol.setPersistentVolumeClaim(source);
+                return vol;
+
+            }).collect(Collectors.toList()));
+        }
+
         var port = new V1ContainerPort();
 
         if (finder.getFileType().equals(FileType.VUE)) {
@@ -263,11 +384,34 @@ public class K8sClient {
 
         port.setName("http");
 
-        var container = new V1ContainerBuilder()
+        var containerBuilder = new V1ContainerBuilder()
                 .withImage(autoCD.getRegistryImagePath())
                 .withName(getName() + "-c")
                 .withPorts(port)
-                .build();
+                .withArgs(autoCD.getArgs());
+
+        var neededInitContainer = new ArrayList<V1Container>();
+        if (!autoCD.getVolumes().isEmpty()) {
+            var volumes = autoCD.getVolumes().stream().map(volume -> {
+                var vol = new V1VolumeMount();
+                vol.setName(getPVCName(volume, autoCD));
+                vol.setMountPath(volume.getVolumeMount());
+
+                if (volume.getFilePermission() != null) {
+                    neededInitContainer.add(getVolumePermissionConditioner(volume.getFilePermission(), vol));
+                }
+
+                return vol;
+            }).collect(Collectors.toList());
+
+            if (!neededInitContainer.isEmpty()) {
+                podSpec.setInitContainers(neededInitContainer);
+            }
+
+            containerBuilder = containerBuilder.withVolumeMounts(volumes);
+        }
+
+        var container = containerBuilder.build();
 
         podSpec.setContainers(List.of(container));
 
@@ -281,6 +425,18 @@ public class K8sClient {
         dep.setKind("Deployment");
         dep.setApiVersion(getApiVersion());
         return dep;
+    }
+
+    private V1Container getVolumePermissionConditioner(String perm, V1VolumeMount vol) {
+        return new V1ContainerBuilder()
+                .withImage("busybox")
+                .withName("busybox" + "-c")
+                .withCommand("/bin/chmod", "-R", perm, "/data")
+                .withVolumeMounts(new V1VolumeMountBuilder()
+                        .withName(vol.getName())
+                        .withMountPath("/data")
+                        .build()
+                ).build();
     }
 
     @NotNull
