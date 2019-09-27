@@ -33,7 +33,7 @@ import io.kubernetes.client.models.V1beta1IngressRuleBuilder;
 import io.kubernetes.client.models.V1beta1IngressSpecBuilder;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.Consumer;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -48,10 +48,6 @@ public class K8sClient {
     public K8sClient(CoreV1Api api, DockerfileHandler finder) {
         this.api = api;
         this.finder = finder;
-    }
-
-    private static Void apply(ExtensionsV1beta1Deployment deployment1) {
-        return null;
     }
 
     public void deployToK8s(AutoCD autoCD) throws ApiException {
@@ -128,7 +124,7 @@ public class K8sClient {
         }
     }
 
-    private Void createIngress(V1beta1Ingress ingress) {
+    private void createIngress(V1beta1Ingress ingress) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             extensionsV1beta1Api.createNamespacedIngress(ingress.getMetadata().getNamespace(), ingress, false, "true", null);
@@ -136,7 +132,7 @@ public class K8sClient {
             retry(ingress, this::createIngress, e);
         }
 
-        return null;
+
     }
 
     @NotNull
@@ -147,17 +143,17 @@ public class K8sClient {
     }
 
 
-    private Void createService(V1Service service) {
+    private void createService(V1Service service) {
         try {
             api.createNamespacedService(service.getMetadata().getNamespace(), service, false, "true", null);
         } catch (ApiException e) {
             retry(service, this::createService, e);
         }
 
-        return null;
+
     }
 
-    private Void createDeployment(ExtensionsV1beta1Deployment deployment) {
+    private void createDeployment(ExtensionsV1beta1Deployment deployment) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
@@ -165,17 +161,17 @@ public class K8sClient {
             retry(deployment, this::createDeployment, e);
         }
 
-        return null;
+
     }
 
-    private Void createNamespace(V1Namespace nameSpace) {
+    private void createNamespace(V1Namespace nameSpace) {
         try {
             api.createNamespace(nameSpace, false, "true", null);
         } catch (ApiException e) {
             retry(nameSpace, this::createNamespace, e);
         }
 
-        return null;
+
     }
 
     @NotNull
@@ -338,14 +334,14 @@ public class K8sClient {
         deleteDeployment(deployment);
     }
 
-    private <T> void retry(T obj, Function<T, Void> function, ApiException e) {
+    private <T> void retry(T obj, Consumer<T> function, ApiException e) {
         if (e.getMessage().equals("Conflict")) {
             var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
             if (resp.getMessage().startsWith("object is being deleted")) {
                 try {
                     log.info("Object is still being deleted, retrying...");
                     Thread.sleep(4000);
-                    function.apply(obj);
+                    function.accept(obj);
                     return;
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
