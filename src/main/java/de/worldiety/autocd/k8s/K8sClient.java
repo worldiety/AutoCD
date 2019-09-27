@@ -50,10 +50,11 @@ public class K8sClient {
         this.finder = finder;
     }
 
-    public void deployToK8s(AutoCD autoCD) throws ApiException {
+    public void deployToK8s(AutoCD autoCD) {
         deploy(autoCD);
     }
 
+    @SuppressWarnings("unused")
     private void deleteNamespace(@NotNull V1Namespace namespace) {
         try {
             api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, null);
@@ -102,11 +103,12 @@ public class K8sClient {
      *
      * @param ignored ignored
      */
+    @SuppressWarnings("unused")
     private void ignoreGoogleParsingError(JsonSyntaxException ignored) {
         //No-op
     }
 
-    private void deploy(AutoCD autoCD) throws ApiException {
+    private void deploy(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
         deleteIngress(ingress);
         var service = getService(autoCD);
@@ -131,8 +133,6 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(ingress, this::createIngress, e);
         }
-
-
     }
 
     @NotNull
@@ -334,7 +334,7 @@ public class K8sClient {
         deleteDeployment(deployment);
     }
 
-    private <T> void retry(T obj, Consumer<T> function, ApiException e) {
+    private <T> void retry(T obj, @NotNull Consumer<T> function, @NotNull ApiException e) {
         if (e.getMessage().equals("Conflict")) {
             var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
             if (resp.getMessage().startsWith("object is being deleted")) {

@@ -71,13 +71,8 @@ public class Main {
             return;
         }
 
-        try {
-            k8sClient.deployToK8s(autoCD);
-            log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
-        } catch (ApiException e) {
-            log.warn("not caught " + e);
-            e.printStackTrace();
-        }
+        k8sClient.deployToK8s(autoCD);
+        log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
     }
 
 }
