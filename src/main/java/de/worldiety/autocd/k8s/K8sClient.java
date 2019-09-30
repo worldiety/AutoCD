@@ -314,7 +314,7 @@ public class K8sClient {
     }
 
     private String getK8sApp(AutoCD autoCD) {
-        return getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath()).substring(0, 20);
+        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20);
     }
 
     @NotNull
@@ -450,6 +450,7 @@ public class K8sClient {
 
         if (!isLocal()) {
             nameSpaceName = System.getenv(Environment.CI_PROJECT_NAMESPACE.toString());
+            nameSpaceName = nameSpaceName.replaceAll("/", "--");
         }
 
         return nameSpaceName;

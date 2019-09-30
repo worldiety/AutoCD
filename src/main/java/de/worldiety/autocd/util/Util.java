@@ -6,6 +6,8 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 public class Util {
@@ -16,7 +18,10 @@ public class Util {
             return "local-test" + CLOUDIETY_DOMAIN;
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + "-" + System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()) + CLOUDIETY_DOMAIN;
+        return System.getenv(Environment.CI_PROJECT_NAME.toString()) +
+                "-" +
+                System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()).replaceAll("/", "--") +
+                CLOUDIETY_DOMAIN;
     }
 
 
