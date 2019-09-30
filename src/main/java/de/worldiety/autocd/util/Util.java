@@ -6,14 +6,12 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 
 public class Util {
     public static final String CLOUDIETY_DOMAIN = ".cloudiety.de";
 
-    public static String buildSubdomain() {
+    public static String buildSubdomain(String buildType) {
         if (isLocal()) {
             return "local-test" + CLOUDIETY_DOMAIN;
         }
@@ -21,6 +19,8 @@ public class Util {
         return System.getenv(Environment.CI_PROJECT_NAME.toString()) +
                 "-" +
                 System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()).replaceAll("/", "--") +
+                "-" +
+                buildType +
                 CLOUDIETY_DOMAIN;
     }
 
@@ -48,7 +48,6 @@ public class Util {
         }
         return hexString.toString();
     }
-
 
 
     public static String hash(String toHash) {

@@ -13,12 +13,10 @@ import io.kubernetes.client.Configuration;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.KubeConfig;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,8 +57,15 @@ public class Main {
             }
         }
 
+        String buildType;
+        if (args.length == 4) {
+            buildType = args[3];
+        } else {
+            buildType = "dev";
+        }
+
         if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
-            autoCD.setSubdomain(Util.buildSubdomain());
+            autoCD.setSubdomain(Util.buildSubdomain(buildType));
         }
 
         if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
@@ -68,7 +73,7 @@ public class Main {
         }
 
         CoreV1Api api = new CoreV1Api();
-        var k8sClient = new K8sClient(api, finder);
+        var k8sClient = new K8sClient(api, finder, buildType);
         if (!autoCD.isShouldHost()) {
             if (!autoCD.getOtherImages().isEmpty()) {
                 autoCD.getOtherImages().forEach(config -> {

@@ -43,13 +43,10 @@ import io.kubernetes.client.models.V1beta1Ingress;
 import io.kubernetes.client.models.V1beta1IngressBackendBuilder;
 import io.kubernetes.client.models.V1beta1IngressRuleBuilder;
 import io.kubernetes.client.models.V1beta1IngressSpecBuilder;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.Contract;
@@ -61,11 +58,13 @@ public class K8sClient {
     private static final Logger log = LoggerFactory.getLogger(K8sClient.class);
     private final CoreV1Api api;
     private final DockerfileHandler finder;
+    private final String buildType;
 
     @Contract(pure = true)
-    public K8sClient(CoreV1Api api, DockerfileHandler finder) {
+    public K8sClient(CoreV1Api api, DockerfileHandler finder, String buildType) {
         this.api = api;
         this.finder = finder;
+        this.buildType = "-" + buildType;
     }
 
     public void deployToK8s(AutoCD autoCD) {
@@ -164,6 +163,7 @@ public class K8sClient {
         var claims = getPersistentVolumeClaims(autoCD);
         deleteClaims(claims);
         var nameSpace = getNamespace();
+        cleanupPVC(nameSpace.getMetadata().getName());
 
         createNamespace(nameSpace);
         createClaims(claims);
@@ -172,6 +172,27 @@ public class K8sClient {
 
         if (autoCD.isPubliclyAccessible()) {
             createIngress(ingress);
+        }
+    }
+
+    private void cleanupPVC(String namespace) {
+        try {
+            var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, false, "true", null, null, null, null, null, null, null);
+            var pods = api.listNamespacedPod(namespace, false, "true", null, null, null, null, null, null, null);
+            var validPVCNames = pods.getItems()
+                    .stream()
+                    .filter(pod -> pod.getSpec().getVolumes().size() > 0)
+                    .map(it -> it.getSpec().getVolumes())
+                    .flatMap(Collection::stream)
+                    .map(V1Volume::getName)
+                    .collect(Collectors.toList());
+
+            pvcs.getItems().stream()
+                    .filter(it -> !validPVCNames.contains(it.getMetadata().getName()))
+                    .forEach(this::applyDeleteClaim);
+
+        } catch (ApiException e) {
+            log.error("Could not perform PVC cleanup: ", e);
         }
     }
 
@@ -314,7 +335,7 @@ public class K8sClient {
     }
 
     private String getK8sApp(AutoCD autoCD) {
-        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20);
+        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + buildType;
     }
 
     @NotNull
@@ -434,7 +455,7 @@ public class K8sClient {
             return "local-default-name";
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString());
+        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + buildType;
     }
 
 
@@ -450,10 +471,10 @@ public class K8sClient {
 
         if (!isLocal()) {
             nameSpaceName = System.getenv(Environment.CI_PROJECT_NAMESPACE.toString());
-            nameSpaceName = nameSpaceName.replaceAll("/", "--");
+            nameSpaceName = nameSpaceName.replaceAll("/", "-");
         }
 
-        return nameSpaceName;
+        return nameSpaceName + buildType;
     }
 
     @NotNull
