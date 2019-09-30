@@ -3,6 +3,10 @@ package de.worldiety.autocd.util;
 import de.worldiety.autocd.docker.Docker;
 import de.worldiety.autocd.persistence.AutoCD;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 
 public class Util {
     public static final String CLOUDIETY_DOMAIN = ".cloudiety.de";
@@ -38,5 +42,20 @@ public class Util {
             hexString.append(hex);
         }
         return hexString.toString();
+    }
+
+
+
+    public static String hash(String toHash) {
+        MessageDigest digest = null;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        byte[] encodedhash = Objects.requireNonNull(digest).digest(
+                toHash.getBytes(StandardCharsets.UTF_8));
+
+        return Util.bytesToHex(encodedhash);
     }
 }

@@ -19,8 +19,9 @@ public class AutoCD {
     private Map<String, String> environmentVariables;
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
+    private String serviceName = null;
 
-    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, String command, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args) {
+    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, String command, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.publiclyAccessible = publiclyAccessible;
@@ -34,9 +35,9 @@ public class AutoCD {
         this.environmentVariables = environmentVariables;
         this.otherImages = otherImages;
         this.args = args;
+        this.serviceName = serviceName;
     }
 
-    @Contract(pure = true)
     public AutoCD() {
     }
 
@@ -142,5 +143,13 @@ public class AutoCD {
 
     public void setDockerImagePath(String dockerImagePath) {
         this.dockerImagePath = dockerImagePath;
+    }
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
     }
 }

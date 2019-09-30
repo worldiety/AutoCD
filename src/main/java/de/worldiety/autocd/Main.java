@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.k8s.K8sClient;
 import de.worldiety.autocd.persistence.AutoCD;
+import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
 import io.kubernetes.client.ApiClient;
@@ -12,10 +13,12 @@ import io.kubernetes.client.Configuration;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.KubeConfig;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +71,10 @@ public class Main {
         var k8sClient = new K8sClient(api, finder);
         if (!autoCD.isShouldHost()) {
             if (!autoCD.getOtherImages().isEmpty()) {
-                autoCD.getOtherImages().forEach(k8sClient::removeFromK8s);
+                autoCD.getOtherImages().forEach(config -> {
+                    setServiceNameForOtherImages(autoCD, config);
+                    k8sClient.removeFromK8s(config);
+                });
             }
 
             k8sClient.removeFromK8s(autoCD);
@@ -77,11 +83,22 @@ public class Main {
         }
 
         if (!autoCD.getOtherImages().isEmpty()) {
-            autoCD.getOtherImages().forEach(k8sClient::deployToK8s);
+            autoCD.getOtherImages().forEach(config -> {
+                setServiceNameForOtherImages(autoCD, config);
+                k8sClient.deployToK8s(config);
+            });
         }
 
         k8sClient.deployToK8s(autoCD);
         log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
+    }
+
+    private static void setServiceNameForOtherImages(AutoCD main, AutoCD other) {
+        if (other.getServiceName() == null) {
+            other.setServiceName(Util.hash(
+                    System.getenv(Environment.CI_PROJECT_NAME.toString()) + main.getRegistryImagePath())
+            );
+        }
     }
 
 }

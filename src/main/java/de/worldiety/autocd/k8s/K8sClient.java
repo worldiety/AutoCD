@@ -1,5 +1,6 @@
 package de.worldiety.autocd.k8s;
 
+import static de.worldiety.autocd.util.Util.hash;
 import static de.worldiety.autocd.util.Util.isLocal;
 
 import com.google.gson.Gson;
@@ -226,19 +227,6 @@ public class K8sClient {
         return hash(str).substring(0, 20);
     }
 
-    private String hash(String toHash) {
-        MessageDigest digest = null;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        byte[] encodedhash = Objects.requireNonNull(digest).digest(
-                toHash.getBytes(StandardCharsets.UTF_8));
-
-        return Util.bytesToHex(encodedhash);
-    }
-
     private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(AutoCD autoCD) {
         return autoCD.getVolumes().stream().map(volume -> {
             var pvc = new V1PersistentVolumeClaim();
@@ -305,10 +293,14 @@ public class K8sClient {
         var service = new V1Service();
         service.setKind("Service");
         var meta = getNamespacedMeta();
-        meta.setName(getNamespaceString() + "-" + getName() + "-service");
+        if (autoCD.getServiceName() != null) {
+            meta.setName(autoCD.getServiceName());
+        } else {
+            meta.setName(getNamespaceString() + "-" + getName() + "-service");
+        }
 
         var spec = new V1ServiceSpec();
-        spec.setSelector(Map.of("k8s-app", getK8sApp()));
+        spec.setSelector(Map.of("k8s-app", getK8sApp(autoCD)));
         var port = new V1ServicePort();
         port.setName("web");
         port.setPort(autoCD.getServicePort());
@@ -321,15 +313,16 @@ public class K8sClient {
         return service;
     }
 
-    private String getK8sApp() {
-        return getNamespaceString() + "-" + getName();
+    private String getK8sApp(AutoCD autoCD) {
+        return getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath()).substring(0, 20);
     }
 
     @NotNull
     private ExtensionsV1beta1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
-        meta.setName(getNamespaceString());
-        var labels = Map.of("k8s-app", getK8sApp());
+        var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
+        meta.setName(Util.hash(getNamespaceString() + autoCD.getRegistryImagePath() + projName));
+        var labels = Map.of("k8s-app", getK8sApp(autoCD));
         meta.setLabels(labels);
 
         var spec = new ExtensionsV1beta1DeploymentSpec();
@@ -344,7 +337,7 @@ public class K8sClient {
         template.setMetadata(templateMeta);
 
         templateMeta.setLabels(Map.of(
-                "k8s-app", getK8sApp(),
+                "k8s-app", getK8sApp(autoCD),
                 "name", getName()));
         template.setMetadata(templateMeta);
 
@@ -479,6 +472,8 @@ public class K8sClient {
         deleteService(service);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
+        var claims = getPersistentVolumeClaims(autoCD);
+        deleteClaims(claims);
     }
 
     private <T> void retry(T obj, @NotNull Consumer<T> function, @NotNull ApiException e) {
