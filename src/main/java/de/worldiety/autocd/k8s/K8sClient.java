@@ -14,33 +14,8 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.models.ExtensionsV1beta1Deployment;
-import io.kubernetes.client.models.ExtensionsV1beta1DeploymentSpec;
-import io.kubernetes.client.models.V1Container;
-import io.kubernetes.client.models.V1ContainerBuilder;
-import io.kubernetes.client.models.V1ContainerPort;
-import io.kubernetes.client.models.V1LabelSelector;
-import io.kubernetes.client.models.V1LocalObjectReference;
-import io.kubernetes.client.models.V1Namespace;
-import io.kubernetes.client.models.V1ObjectMeta;
-import io.kubernetes.client.models.V1PersistentVolumeClaim;
-import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
-import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
-import io.kubernetes.client.models.V1PodSpec;
-import io.kubernetes.client.models.V1PodTemplateSpec;
-import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
-import io.kubernetes.client.models.V1Service;
-import io.kubernetes.client.models.V1ServicePort;
-import io.kubernetes.client.models.V1ServiceSpec;
-import io.kubernetes.client.models.V1Volume;
-import io.kubernetes.client.models.V1VolumeMount;
-import io.kubernetes.client.models.V1VolumeMountBuilder;
-import io.kubernetes.client.models.V1beta1HTTPIngressPathBuilder;
-import io.kubernetes.client.models.V1beta1HTTPIngressRuleValueBuilder;
-import io.kubernetes.client.models.V1beta1Ingress;
-import io.kubernetes.client.models.V1beta1IngressBackendBuilder;
-import io.kubernetes.client.models.V1beta1IngressRuleBuilder;
-import io.kubernetes.client.models.V1beta1IngressSpecBuilder;
+import io.kubernetes.client.models.*;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -131,6 +106,21 @@ public class K8sClient {
         }
     }
 
+    private void cleanUpReplicaSets(String namespace, String matchLabelKey, String matchLabelValue) {
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+        try {
+            var labelSelector = String.format("%s: %s", matchLabelKey, matchLabelValue);
+            var replicas = extensionsV1beta1Api.listNamespacedReplicaSet(namespace, false, null, null, null, labelSelector, Integer.MAX_VALUE, null, 30, false);
+            for (var replicaSet : replicas.getItems()) {
+                extensionsV1beta1Api.deleteNamespacedReplicaSet(replicaSet.getMetadata().getName(), namespace, null, null, null, 60, false, null);
+            }
+        } catch (ApiException e) {
+            log.error("Could not delete ingress", e);
+        } catch (JsonSyntaxException e) {
+            ignoreGoogleParsingError(e);
+        }
+    }
+
     private void deleteService(@NotNull V1Service service) {
         try {
             api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, null);
@@ -169,6 +159,7 @@ public class K8sClient {
         deleteService(service);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
+        cleanUpReplicaSets(getNamespaceString(), "k8s-app", getK8sApp());
         var claims = getPersistentVolumeClaims(autoCD);
         deleteClaims(claims);
         var nameSpace = getNamespace();
@@ -488,6 +479,7 @@ public class K8sClient {
         deleteService(service);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
+        cleanUpReplicaSets(getNamespaceString(), "k8s-app", getK8sApp());
     }
 
     private <T> void retry(T obj, @NotNull Consumer<T> function, @NotNull ApiException e) {
