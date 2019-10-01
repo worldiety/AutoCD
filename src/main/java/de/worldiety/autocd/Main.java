@@ -11,8 +11,10 @@ import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.Configuration;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.custom.V1Patch;
+import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.Config;
-import io.kubernetes.client.util.KubeConfig;
+import io.kubernetes.client.util.credentials.AccessTokenAuthentication;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
@@ -27,13 +29,8 @@ public class Main {
         DockerfileHandler finder = new DockerfileHandler(".");
         ApiClient client;
 
-        //TODO: configurable
-        if (Util.isLocal()) {
-            client = Config.fromConfig(KubeConfig.loadKubeConfig(new FileReader("/Users/lgrahmann/Downloads/kuberniety-kubeconfig.yaml")));
-        } else {
-            client = Config.fromToken(args[0], args[1]).setSslCaCert(new FileInputStream(args[2]));
-        }
 
+        client = Config.fromToken(args[0], args[1]).setSslCaCert(new FileInputStream(args[2]));
         Configuration.setDefaultApiClient(client);
 
         var autocdConfigFile = new File("autocd.json");
@@ -72,8 +69,19 @@ public class Main {
             autoCD.setContainerPort(80);
         }
 
+
+
+        ApiClient strategicMergePatchClient =
+                ClientBuilder.standard()
+                        .setBasePath(args[0])
+                        .setVerifyingSsl(true)
+                        .setAuthentication(new AccessTokenAuthentication(args[1]))
+                        .setOverridePatchFormat(V1Patch.PATCH_FORMAT_JSON_PATCH)
+                        .build().setSslCaCert(new FileInputStream(args[2]));
+
+        CoreV1Api patchApi = new CoreV1Api(strategicMergePatchClient);
         CoreV1Api api = new CoreV1Api();
-        var k8sClient = new K8sClient(api, finder, buildType);
+        var k8sClient = new K8sClient(api, finder, buildType, patchApi);
         if (!autoCD.isShouldHost()) {
             if (!autoCD.getOtherImages().isEmpty()) {
                 autoCD.getOtherImages().forEach(config -> {
@@ -86,7 +94,6 @@ public class Main {
             log.info("Service is being removed from k8s.");
             return;
         }
-
 
 
         deployWithDependencies(autoCD, k8sClient);

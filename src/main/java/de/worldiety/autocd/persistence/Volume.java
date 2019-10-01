@@ -7,7 +7,7 @@ public class Volume {
     private String volumeMount;
     private String volumeSize = "1Gi";
     private String filePermission;
-    private boolean retainVolume;
+    private boolean retainVolume = true;
 
     public Volume(String volumeMount, String volumeSize, String filePermission, boolean retainVolume) {
         this.volumeMount = volumeMount;

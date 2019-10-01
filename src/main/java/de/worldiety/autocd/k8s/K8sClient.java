@@ -32,6 +32,7 @@ import io.kubernetes.client.models.V1LabelSelector;
 import io.kubernetes.client.models.V1LocalObjectReference;
 import io.kubernetes.client.models.V1Namespace;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.models.V1PersistentVolume;
 import io.kubernetes.client.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
 import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
@@ -62,12 +63,14 @@ public class K8sClient {
     private final CoreV1Api api;
     private final DockerfileHandler finder;
     private final String buildType;
+    private final CoreV1Api patchApi;
 
     @Contract(pure = true)
-    public K8sClient(CoreV1Api api, DockerfileHandler finder, String buildType) {
+    public K8sClient(CoreV1Api api, DockerfileHandler finder, String buildType, CoreV1Api patchApi) {
         this.api = api;
         this.finder = finder;
         this.buildType = "-" + buildType;
+        this.patchApi = patchApi;
     }
 
     public void deployToK8s(AutoCD autoCD) {
@@ -162,9 +165,12 @@ public class K8sClient {
         deleteIngress(ingress);
         var service = getService(autoCD);
         deleteService(service);
+        var claims = getPersistentVolumeClaims(autoCD);
+        var pvs = protectPVS(autoCD, claims);
+        log.info(pvs.toString());
+        unprotectPVS(autoCD, claims);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
-        var claims = getPersistentVolumeClaims(autoCD);
         deleteClaims(claims);
         var nameSpace = getNamespace();
         cleanupPVC(nameSpace.getMetadata().getName(), claims, autoCD);
@@ -174,38 +180,96 @@ public class K8sClient {
         createDeployment(deployment);
         createService(service);
 
+        reclaimPVS(pvs);
+
         if (autoCD.isPubliclyAccessible()) {
             createIngress(ingress);
         }
     }
 
-    private void protectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
+    private void reclaimPVS(List<String> pvs) {
+        pvs.forEach(pv -> {
+            V1Patch reclaimPatch = new V1Patch("[{\"op\":\"remove\",\"path\":\"/spec/claimRef\"}]");
+            try {
+                patchApi.patchPersistentVolume(pv, reclaimPatch, null, null, null, null);
+            } catch (ApiException e) {
+                log.error("Could not reclaim PV", e);
+                throw new IllegalStateException(e);
+            }
+        });
+    }
+
+    private void unprotectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
         V1PersistentVolumeList pvs = null;
         try {
             pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
-            var namesToProtect = autoCD.getVolumes().stream().map(it -> getPVCName(it, autoCD)).collect(Collectors.toList());
+            List<String> namesToProtect = getNamesToProtect(autoCD);
+
             pvs.getItems().forEach(pv -> {
                 var name = pv.getSpec().getClaimRef().getName();
-                if (!namesToProtect.contains(name)) {
+                if (namesToProtect.contains(name)) {
                     return;
                 }
-                var modifiedSpec = pv.getSpec();
-                modifiedSpec.setClaimRef(null);
-                modifiedSpec.setPersistentVolumeReclaimPolicy("Retain");
 
-                pv.setSpec(modifiedSpec);
-                V1Patch body = new V1Patch(""); // V1Patch |
+                V1Patch deletePatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Delete\"}]");
 
-                try {
-                    api.patchPersistentVolume(pv.getMetadata().getName(), body, null, null, null, null);
-                } catch (ApiException e) {
-                    e.printStackTrace();
-                }
+                applyPatchToPVS(claims, pv, name, deletePatch);
             });
 
         } catch (ApiException e) {
             log.error("Could not perform PV protection: ", e);
         }
+    }
+
+    @NotNull
+    private List<String> getNamesToProtect(AutoCD autoCD) {
+        return autoCD.getVolumes()
+                .stream()
+                .filter(Volume::isRetainVolume)
+                .map(it -> getPVCName(it, autoCD))
+                .collect(Collectors.toList());
+    }
+
+    private void applyPatchToPVS(List<V1PersistentVolumeClaim> claims, V1PersistentVolume pv, String name, V1Patch patch) {
+        try {
+            patchApi.patchPersistentVolume(pv.getMetadata().getName(), patch, null, null, null, null);
+
+        } catch (ApiException e) {
+            log.error("Could not patch PV", e);
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private List<String> protectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
+        V1PersistentVolumeList pvs = null;
+        var strings = new ArrayList<String>();
+        try {
+            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
+            List<String> namesToProtect = getNamesToProtect(autoCD);
+
+            pvs.getItems().forEach(pv -> {
+                var name = pv.getSpec().getClaimRef().getName();
+                if (!namesToProtect.contains(name)) {
+                    return;
+                }
+
+                strings.add(pv.getMetadata().getName());
+
+                V1Patch retainPatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Retain\"}]");
+
+                applyPatchToPVS(claims, pv, name, retainPatch);
+
+                claims.stream().filter(it -> it.getMetadata().getName().equals(name)).forEach(it -> {
+                    var spec = it.getSpec();
+                    spec.setVolumeName(pv.getMetadata().getName());
+                });
+            });
+
+        } catch (ApiException e) {
+            log.error("Could not perform PV protection: ", e);
+        }
+
+        return strings;
     }
 
     private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims, AutoCD autoCD) {
