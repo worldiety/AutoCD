@@ -153,6 +153,7 @@ public class K8sClient {
         //No-op
     }
 
+    @SuppressWarnings("DuplicatedCode")
     private void deploy(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
         deleteIngress(ingress);
@@ -276,18 +277,23 @@ public class K8sClient {
         var meta = getNamespacedMeta();
         meta.setName(getNamespaceString() + "-" + getName() + "-ingress");
 
-        /*ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null, null);
-            var contained = ingresses.getItems()
+            var ingressWithHostAlreadyPresent = ingresses.getItems()
                     .stream()
                     .filter(it -> !it.getMetadata().getNamespace().equals(meta.getNamespace()))
                     .anyMatch(it ->
                             it.getSpec().getRules().stream()
                                     .anyMatch(rule -> rule.getHost().equals(autoCD.getSubdomain())));
+
+            if (ingressWithHostAlreadyPresent) {
+                throw new IllegalStateException("There is already an ingress with host: " + autoCD.getSubdomain() + " present");
+            }
+
         } catch (ApiException e) {
             e.printStackTrace();
-        }*/
+        }
 
         var spec = new V1beta1IngressSpecBuilder()
                 .withRules(new V1beta1IngressRuleBuilder()
@@ -487,6 +493,7 @@ public class K8sClient {
         return ns;
     }
 
+    @SuppressWarnings("DuplicatedCode")
     public void removeFromK8s(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
         deleteIngress(ingress);
