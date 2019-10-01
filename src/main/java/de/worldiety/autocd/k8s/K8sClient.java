@@ -16,8 +16,15 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.custom.V1Patch;
 import io.kubernetes.client.models.ExtensionsV1beta1Deployment;
 import io.kubernetes.client.models.ExtensionsV1beta1DeploymentSpec;
+import io.kubernetes.client.models.ExtensionsV1beta1HTTPIngressPathBuilder;
+import io.kubernetes.client.models.ExtensionsV1beta1HTTPIngressRuleValueBuilder;
+import io.kubernetes.client.models.ExtensionsV1beta1Ingress;
+import io.kubernetes.client.models.ExtensionsV1beta1IngressBackendBuilder;
+import io.kubernetes.client.models.ExtensionsV1beta1IngressRuleBuilder;
+import io.kubernetes.client.models.ExtensionsV1beta1IngressSpecBuilder;
 import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
 import io.kubernetes.client.models.V1ContainerPort;
@@ -28,6 +35,7 @@ import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
 import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
+import io.kubernetes.client.models.V1PersistentVolumeList;
 import io.kubernetes.client.models.V1PodSpec;
 import io.kubernetes.client.models.V1PodTemplateSpec;
 import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
@@ -37,12 +45,6 @@ import io.kubernetes.client.models.V1ServiceSpec;
 import io.kubernetes.client.models.V1Volume;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
-import io.kubernetes.client.models.V1beta1HTTPIngressPathBuilder;
-import io.kubernetes.client.models.V1beta1HTTPIngressRuleValueBuilder;
-import io.kubernetes.client.models.V1beta1Ingress;
-import io.kubernetes.client.models.V1beta1IngressBackendBuilder;
-import io.kubernetes.client.models.V1beta1IngressRuleBuilder;
-import io.kubernetes.client.models.V1beta1IngressSpecBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -94,6 +96,7 @@ public class K8sClient {
     private void applyDeleteClaim(V1PersistentVolumeClaim claim) {
         try {
             api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
+            log.info("Deleted claim: " + claim.getMetadata().getName());
         } catch (ApiException e) {
             retry(claim, this::applyDeleteClaim, e);
         } catch (JsonSyntaxException e) {
@@ -132,7 +135,7 @@ public class K8sClient {
         }
     }
 
-    private void deleteIngress(@NotNull V1beta1Ingress ingress) {
+    private void deleteIngress(@NotNull ExtensionsV1beta1Ingress ingress) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
@@ -164,7 +167,7 @@ public class K8sClient {
         var claims = getPersistentVolumeClaims(autoCD);
         deleteClaims(claims);
         var nameSpace = getNamespace();
-        cleanupPVC(nameSpace.getMetadata().getName());
+        cleanupPVC(nameSpace.getMetadata().getName(), claims, autoCD);
 
         createNamespace(nameSpace);
         createClaims(claims);
@@ -176,10 +179,39 @@ public class K8sClient {
         }
     }
 
-    private void cleanupPVC(String namespace) {
+    private void protectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
+        V1PersistentVolumeList pvs = null;
         try {
-            var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, false, "true", null, null, null, null, null, null, null);
-            var pods = api.listNamespacedPod(namespace, false, "true", null, null, null, null, null, null, null);
+            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
+            var namesToProtect = autoCD.getVolumes().stream().map(it -> getPVCName(it, autoCD)).collect(Collectors.toList());
+            pvs.getItems().forEach(pv -> {
+                var name = pv.getSpec().getClaimRef().getName();
+                if (!namesToProtect.contains(name)) {
+                    return;
+                }
+                var modifiedSpec = pv.getSpec();
+                modifiedSpec.setClaimRef(null);
+                modifiedSpec.setPersistentVolumeReclaimPolicy("Retain");
+
+                pv.setSpec(modifiedSpec);
+                V1Patch body = new V1Patch(""); // V1Patch |
+
+                try {
+                    api.patchPersistentVolume(pv.getMetadata().getName(), body, null, null, null, null);
+                } catch (ApiException e) {
+                    e.printStackTrace();
+                }
+            });
+
+        } catch (ApiException e) {
+            log.error("Could not perform PV protection: ", e);
+        }
+    }
+
+    private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims, AutoCD autoCD) {
+        try {
+            var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, "true", null, null, null, null, null, null, null);
+            var pods = api.listNamespacedPod(namespace, "true", null, null, null, null, null, null, null);
             var validPVCNames = pods.getItems()
                     .stream()
                     .filter(pod -> pod.getSpec().getVolumes().size() > 0)
@@ -190,6 +222,7 @@ public class K8sClient {
 
             pvcs.getItems().stream()
                     .filter(it -> !validPVCNames.contains(it.getMetadata().getName()))
+                    .filter(it -> claims.stream().noneMatch(claim -> claim.getMetadata().getName().equals(it.getMetadata().getName())))
                     .forEach(this::applyDeleteClaim);
 
         } catch (ApiException e) {
@@ -197,10 +230,10 @@ public class K8sClient {
         }
     }
 
-    private void createIngress(V1beta1Ingress ingress) {
+    private void createIngress(ExtensionsV1beta1Ingress ingress) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            extensionsV1beta1Api.createNamespacedIngress(ingress.getMetadata().getNamespace(), ingress, false, "true", null);
+            extensionsV1beta1Api.createNamespacedIngress(ingress.getMetadata().getNamespace(), ingress, "true", null, null);
         } catch (ApiException e) {
             retry(ingress, this::createIngress, e);
         }
@@ -215,7 +248,7 @@ public class K8sClient {
 
     private void createService(V1Service service) {
         try {
-            api.createNamespacedService(service.getMetadata().getNamespace(), service, false, "true", null);
+            api.createNamespacedService(service.getMetadata().getNamespace(), service, "true", null, null);
         } catch (ApiException e) {
             retry(service, this::createService, e);
         }
@@ -226,7 +259,7 @@ public class K8sClient {
     private void createDeployment(ExtensionsV1beta1Deployment deployment) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, false, "true", null);
+            extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, "true", null, null);
         } catch (ApiException e) {
             retry(deployment, this::createDeployment, e);
         }
@@ -236,7 +269,7 @@ public class K8sClient {
 
     private void createNamespace(V1Namespace nameSpace) {
         try {
-            api.createNamespace(nameSpace, false, "true", null);
+            api.createNamespace(nameSpace, "true", null, null);
         } catch (ApiException e) {
             retry(nameSpace, this::createNamespace, e);
         }
@@ -271,15 +304,15 @@ public class K8sClient {
     }
 
     @NotNull
-    private V1beta1Ingress getIngress(@NotNull AutoCD autoCD) {
-        var ingress = new V1beta1Ingress();
+    private ExtensionsV1beta1Ingress getIngress(@NotNull AutoCD autoCD) {
+        var ingress = new ExtensionsV1beta1Ingress();
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
         meta.setName(getNamespaceString() + "-" + getName() + "-ingress");
 
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null, null);
+            var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null);
             var ingressWithHostAlreadyPresent = ingresses.getItems()
                     .stream()
                     .filter(it -> !it.getMetadata().getNamespace().equals(meta.getNamespace()))
@@ -295,12 +328,12 @@ public class K8sClient {
             e.printStackTrace();
         }
 
-        var spec = new V1beta1IngressSpecBuilder()
-                .withRules(new V1beta1IngressRuleBuilder()
+        var spec = new ExtensionsV1beta1IngressSpecBuilder()
+                .withRules(new ExtensionsV1beta1IngressRuleBuilder()
                         .withHost(autoCD.getSubdomain())
-                        .withHttp(new V1beta1HTTPIngressRuleValueBuilder()
-                                .withPaths(new V1beta1HTTPIngressPathBuilder().withPath("/")
-                                        .withBackend(new V1beta1IngressBackendBuilder()
+                        .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
+                                .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
+                                        .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
                                                 .withServiceName(getNamespaceString() + "-" + getName() + "-service")
                                                 .withServicePort(new IntOrString(autoCD.getServicePort()))
                                                 .build())

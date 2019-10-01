@@ -7,15 +7,25 @@ public class Volume {
     private String volumeMount;
     private String volumeSize = "1Gi";
     private String filePermission;
+    private boolean retainVolume;
 
-    public Volume(String volumeMount, String volumeSize, String filePermission) {
+    public Volume(String volumeMount, String volumeSize, String filePermission, boolean retainVolume) {
         this.volumeMount = volumeMount;
         this.volumeSize = volumeSize;
         this.filePermission = filePermission;
+        this.retainVolume = retainVolume;
     }
 
     @Contract(pure = true)
     public Volume() {
+    }
+
+    public boolean isRetainVolume() {
+        return retainVolume;
+    }
+
+    public void setRetainVolume(boolean retainVolume) {
+        this.retainVolume = retainVolume;
     }
 
     public String getFilePermission() {
