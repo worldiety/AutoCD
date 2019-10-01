@@ -52,12 +52,19 @@ public class Docker {
         BuildImageResultCallback callback = new BuildImageResultCallback() {
             @Override
             public void onNext(@NotNull BuildResponseItem item) {
-                if (item.getStream() != null && ! item.getStream().equals(".")) {
+                if (item.getStream() != null && !item.getStream().equals(".")) {
                     log.info(item.getStream());
                 }
                 super.onNext(item);
             }
         };
+
+        var staticDir = new File("static/");
+        if (!staticDir.exists()) {
+            if (!staticDir.mkdir()) {
+                log.error("No write permissions");
+            }
+        }
 
         client.buildImageCmd(configFile)
                 .withTags(Set.of(tag))
@@ -68,7 +75,7 @@ public class Docker {
             client.pushImageCmd(tag).exec(new PushImageResultCallback() {
                 @Override
                 public void onNext(PushResponseItem item) {
-                    if (item.getStream() != null && ! item.getStream().equals(".")) {
+                    if (item.getStream() != null && !item.getStream().equals(".")) {
                         log.info(item.getStream());
                     }
                     super.onNext(item);

@@ -3,9 +3,10 @@ package de.worldiety.autocd.util;
 import org.jetbrains.annotations.Contract;
 
 public enum FileType {
-    JAVA("java", "openjdk-12-docker", "spring-12-docker"), GO("go", "go-1.13"), VUE("vue", "vue-builder-docker", "vue-prod-docker"), OTHER("other");
+    JAVA("java", "openjdk-12-builder", "openjdk-12-prod", "RUN ./gradlew build\n"), GO("go", "go-1.13-builder", "RUN go build -o app . \n"), VUE("vue", "vue-builder", "vue-prod", "RUN npm run build\n"), OTHER("other");
 
     private final String name;
+    private String defaultBuild;
     private String dockerConfig;
     private String finalDocker;
 
@@ -25,6 +26,21 @@ public enum FileType {
         this.name = name;
         this.dockerConfig = dockerConfig;
         this.finalDocker = finalDocker;
+    }
+
+    FileType(String name, String dockerConfig, String finalDocker, String defaultBuild) {
+        this.name = name;
+        this.dockerConfig = dockerConfig;
+        this.finalDocker = finalDocker;
+        this.defaultBuild = defaultBuild;
+    }
+
+    public String getDefaultBuild() {
+        return defaultBuild;
+    }
+
+    public void setDefaultBuild(String defaultBuild) {
+        this.defaultBuild = defaultBuild;
     }
 
     @Contract(pure = true)

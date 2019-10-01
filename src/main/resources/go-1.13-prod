@@ -1,0 +1,5 @@
+FROM golang:1.13.1-alpine as
+
+COPY --from=builder /app/app app
+
+CMD ["./app"]

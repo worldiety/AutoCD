@@ -3,7 +3,6 @@ package de.worldiety.autocd.persistence;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.jetbrains.annotations.Contract;
 
 public class AutoCD {
     private int containerPort = 8080;

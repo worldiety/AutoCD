@@ -1,10 +1,14 @@
 package de.worldiety.autocd.docker;
 
 import de.worldiety.autocd.util.FileType;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -16,7 +20,6 @@ import org.jetbrains.annotations.NotNull;
 
 public class DockerfileHandler {
     private List<File> fileList = new ArrayList<>();
-    private FileType type;
 
     public DockerfileHandler(String path) {
         prepFileList(path);
@@ -76,13 +79,6 @@ public class DockerfileHandler {
         }
     }
 
-    public FileType getType() {
-        return type;
-    }
-
-    public void setType(FileType type) {
-        this.type = type;
-    }
 
     public FileType getFileType() {
         return fileList.stream()
@@ -100,7 +96,7 @@ public class DockerfileHandler {
                 .findFirst();
 
         return opt.map(ftype -> {
-            this.type = ftype;
+            var customBuildsh = new File("build.sh");
             var nFile = new File("Dockerfile");
             System.out.println(nFile);
             try {
@@ -109,10 +105,16 @@ public class DockerfileHandler {
                 IOUtils.copy(getFileFromResources(ftype.getDockerConfig()), fout);
                 fout.flush();
 
-                if (ftype.equals(FileType.JAVA) || ftype.equals(FileType.VUE)) {
-                    IOUtils.copy(getFileFromResources(ftype.getFinalDocker()), fout);
-                    fout.flush();
+                if (customBuildsh.exists()) {
+                    IOUtils.copy(getFileFromResources("run-build-part"), fout);
+                } else {
+                    var bfout = new BufferedWriter(new OutputStreamWriter(fout));
+                    bfout.write(ftype.getDefaultBuild());
+                    bfout.flush();
                 }
+
+                IOUtils.copy(getFileFromResources(ftype.getFinalDocker()), fout);
+                fout.flush();
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -121,5 +123,4 @@ public class DockerfileHandler {
             return nFile.getAbsoluteFile();
         });
     }
-
 }

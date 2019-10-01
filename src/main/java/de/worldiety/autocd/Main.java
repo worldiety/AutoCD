@@ -87,14 +87,9 @@ public class Main {
             return;
         }
 
-        if (!autoCD.getOtherImages().isEmpty()) {
-            autoCD.getOtherImages().forEach(config -> {
-                setServiceNameForOtherImages(autoCD, config);
-                k8sClient.deployToK8s(config);
-            });
-        }
 
-        k8sClient.deployToK8s(autoCD);
+
+        deployWithDependencies(autoCD, k8sClient);
         log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
     }
 
@@ -104,6 +99,20 @@ public class Main {
                     System.getenv(Environment.CI_PROJECT_NAME.toString()) + main.getRegistryImagePath())
             );
         }
+    }
+
+    private static void deployWithDependencies(AutoCD autoCD, K8sClient k8sClient) {
+        if (!autoCD.getOtherImages().isEmpty()) {
+            autoCD.getOtherImages().forEach(config -> {
+                if (!config.getOtherImages().isEmpty()) {
+                    deployWithDependencies(config, k8sClient);
+                }
+                setServiceNameForOtherImages(autoCD, config);
+                k8sClient.deployToK8s(config);
+            });
+        }
+
+        k8sClient.deployToK8s(autoCD);
     }
 
 }

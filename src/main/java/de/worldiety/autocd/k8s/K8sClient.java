@@ -54,6 +54,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//TODO: comment propagation of deletion
 public class K8sClient {
     private static final Logger log = LoggerFactory.getLogger(K8sClient.class);
     private final CoreV1Api api;
@@ -92,7 +93,6 @@ public class K8sClient {
 
     private void applyDeleteClaim(V1PersistentVolumeClaim claim) {
         try {
-            //api.patchNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), )
             api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
         } catch (ApiException e) {
             retry(claim, this::applyDeleteClaim, e);
