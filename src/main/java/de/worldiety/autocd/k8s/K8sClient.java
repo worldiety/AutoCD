@@ -29,6 +29,8 @@ import io.kubernetes.client.models.ExtensionsV1beta1IngressSpecBuilder;
 import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
 import io.kubernetes.client.models.V1ContainerPort;
+import io.kubernetes.client.models.V1EnvVar;
+import io.kubernetes.client.models.V1EnvVarBuilder;
 import io.kubernetes.client.models.V1LabelSelector;
 import io.kubernetes.client.models.V1LocalObjectReference;
 import io.kubernetes.client.models.V1Namespace;
@@ -69,6 +71,7 @@ public class K8sClient {
     private final CoreV1Api api;
     private final DockerfileHandler finder;
     private final String hyphenedBuildType;
+    private final String rawBuildType;
     private final CoreV1Api patchApi;
 
     @Contract(pure = true)
@@ -76,6 +79,7 @@ public class K8sClient {
         this.api = api;
         this.finder = finder;
         this.hyphenedBuildType = "-" + hyphenedBuildType;
+        this.rawBuildType = hyphenedBuildType;
         this.patchApi = patchApi;
     }
 
@@ -717,11 +721,19 @@ public class K8sClient {
     private V1ContainerBuilder getV1ContainerBuilder(@NotNull AutoCD autoCD) {
         V1ContainerPort port = getV1ContainerPort(autoCD);
 
+        var variables = autoCD.getEnvironmentVariables().get(rawBuildType)
+                .entrySet()
+                .stream()
+                .map(entry -> new V1EnvVarBuilder().withName(entry.getKey()).withValue(entry.getValue()).build())
+                .collect(Collectors.toList());
+
         return new V1ContainerBuilder()
                 .withImage(autoCD.getRegistryImagePath())
                 .withName(getName() + "-c")
                 .withPorts(port)
-                .withArgs(autoCD.getArgs());
+                .withEnv(variables)
+                .withArgs(autoCD.getArgs())
+                .withImagePullPolicy("Always");
     }
 
     @NotNull

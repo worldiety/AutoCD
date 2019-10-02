@@ -15,12 +15,15 @@ public class AutoCD {
     private String subdomain;
     private boolean shouldHost = true;
     private List<Volume> volumes = new ArrayList<>();
-    private Map<String, String> environmentVariables;
+    private Map<String, Map<String, String>> environmentVariables;
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
 
-    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
+    public AutoCD() {
+    }
+
+    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.replicas = replicas;
@@ -35,9 +38,6 @@ public class AutoCD {
         this.otherImages = otherImages;
         this.args = args;
         this.serviceName = serviceName;
-    }
-
-    public AutoCD() {
     }
 
     public int getReplicas() {
@@ -96,11 +96,11 @@ public class AutoCD {
         this.shouldHost = shouldHost;
     }
 
-    public Map<String, String> getEnvironmentVariables() {
+    public Map<String, Map<String, String>> getEnvironmentVariables() {
         return environmentVariables;
     }
 
-    public void setEnvironmentVariables(Map<String, String> environmentVariables) {
+    public void setEnvironmentVariables(Map<String, Map<String, String>> environmentVariables) {
         this.environmentVariables = environmentVariables;
     }
 
