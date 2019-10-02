@@ -12,6 +12,7 @@ import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
@@ -32,8 +33,10 @@ import io.kubernetes.client.models.V1LabelSelector;
 import io.kubernetes.client.models.V1LocalObjectReference;
 import io.kubernetes.client.models.V1Namespace;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.models.V1ObjectMetaBuilder;
 import io.kubernetes.client.models.V1PersistentVolume;
 import io.kubernetes.client.models.V1PersistentVolumeClaim;
+import io.kubernetes.client.models.V1PersistentVolumeClaimSpec;
 import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
 import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
 import io.kubernetes.client.models.V1PersistentVolumeList;
@@ -43,6 +46,8 @@ import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
 import io.kubernetes.client.models.V1Service;
 import io.kubernetes.client.models.V1ServicePort;
 import io.kubernetes.client.models.V1ServiceSpec;
+import io.kubernetes.client.models.V1StatefulSet;
+import io.kubernetes.client.models.V1StatefulSetSpec;
 import io.kubernetes.client.models.V1Volume;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
@@ -80,7 +85,190 @@ public class K8sClient {
      * @param autoCD configuration
      */
     public void deployToK8s(AutoCD autoCD) {
-        deploy(autoCD);
+        if (autoCD.getReplicas() > 1 && autoCD.getVolumes().size() != 0) {
+            this.removeDeploymentFromK8s(autoCD);
+            log.info("Deploying statefulset");
+            deployStateful(autoCD);
+        } else {
+            log.info("Deploying deployment");
+            deploy(autoCD);
+        }
+    }
+
+    private void deployStateful(AutoCD autoCD) {
+        var ingress = getIngress(autoCD);
+        deleteIngress(ingress);
+        var service = getService(autoCD);
+        deleteService(service);
+        var set = getStatefulSet(autoCD);
+        deleteStatefulSet(set);
+        var nameSpace = getNamespace();
+
+        createNamespace(nameSpace);
+        createStatefulSet(set);
+        createService(service);
+        createIngress(ingress);
+    }
+
+    private void createStatefulSet(V1StatefulSet set) {
+        var appsV1Api = getAppsV1ApiClient();
+        try {
+            appsV1Api.createNamespacedStatefulSet(set.getMetadata().getNamespace(), set, "true", null, null);
+        } catch (ApiException e) {
+            retry(set, this::createStatefulSet, e);
+        }
+    }
+
+    private AppsV1Api getAppsV1ApiClient() {
+        var appsV1Api = new AppsV1Api();
+        appsV1Api.setApiClient(api.getApiClient());
+        return appsV1Api;
+    }
+
+    private void deleteStatefulSet(V1StatefulSet set) {
+        var appsV1Api = new AppsV1Api();
+        appsV1Api.setApiClient(api.getApiClient());
+        try {
+            appsV1Api.deleteNamespacedStatefulSet(set.getMetadata().getName(), set.getMetadata().getNamespace(), "true", null, null, null, null, FOREGROUND);
+        } catch (ApiException e) {
+            log.warn("Could not delete deployment", e);
+        } catch (JsonSyntaxException e) {
+            ignoreGoogleParsingError(e);
+        }
+    }
+
+    private V1StatefulSet getStatefulSet(AutoCD autoCD) {
+        var meta = getNamespacedMeta();
+        var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
+        meta.setName(Util.hash(getNamespaceString() + autoCD.getRegistryImagePath() + projName).substring(0, 20));
+        var labels = Map.of("k8s-app", getK8sApp(autoCD));
+        meta.setLabels(labels);
+
+        var spec = new V1StatefulSetSpec();
+        spec.setReplicas(autoCD.getReplicas());
+        var select = new V1LabelSelector();
+        select.setMatchLabels(labels);
+        spec.setSelector(select);
+
+        var template = new V1PodTemplateSpec();
+        spec.setTemplate(template);
+        var templateMeta = new V1ObjectMeta();
+        template.setMetadata(templateMeta);
+
+        templateMeta.setLabels(Map.of(
+                "k8s-app", getK8sApp(autoCD),
+                "name", getName()));
+        template.setMetadata(templateMeta);
+
+        var podSpec = new V1PodSpec();
+        template.setSpec(podSpec);
+
+        podSpec.setTerminationGracePeriodSeconds(autoCD.getTerminationGracePeriod());
+
+        spec.setTemplate(template);
+
+        var templates = autoCD.getVolumes().stream().map(vol -> {
+            var volTemp = new V1PersistentVolumeClaim();
+            volTemp.setMetadata(new V1ObjectMetaBuilder().withName(getVolumeName(vol, autoCD)).build());
+            V1PersistentVolumeClaimSpec volumeClaimSpec = getV1PersistentVolumeClaimSpec(vol);
+            volTemp.setSpec(volumeClaimSpec);
+            return volTemp;
+        }).collect(Collectors.toList());
+
+        spec.setVolumeClaimTemplates(templates);
+
+        V1ContainerBuilder containerBuilder = getV1ContainerBuilder(autoCD);
+
+        var neededInitContainer = new ArrayList<V1Container>();
+        if (!autoCD.getVolumes().isEmpty()) {
+            var volumes = autoCD.getVolumes().stream().map(volume -> {
+                var vol = new V1VolumeMount();
+                vol.setName(getVolumeName(volume, autoCD));
+                vol.setMountPath(volume.getVolumeMount());
+
+                if (volume.getFolderPermission() != null) {
+                    neededInitContainer.add(getVolumePermissionConditioner(volume.getFolderPermission(), vol));
+                }
+
+                return vol;
+            }).collect(Collectors.toList());
+
+            if (!neededInitContainer.isEmpty()) {
+                podSpec.setInitContainers(neededInitContainer);
+            }
+
+            containerBuilder = containerBuilder.withVolumeMounts(volumes);
+        }
+
+        var container = containerBuilder.build();
+
+        podSpec.setContainers(List.of(container));
+
+        var secret = new V1LocalObjectReference();
+        secret.setName("gitlab-bot");
+        podSpec.setImagePullSecrets(List.of(secret));
+
+
+        var dep = new V1StatefulSet();
+        dep.setMetadata(meta);
+        dep.setSpec(spec);
+        dep.setKind("StatefulSet");
+        dep.setApiVersion(getApiVersionAppsV1());
+
+        return dep;
+    }
+
+    @NotNull
+    private V1ContainerPort getV1ContainerPort(AutoCD autoCD) {
+        var port = new V1ContainerPort();
+
+        if (finder.getFileType().equals(FileType.VUE)) {
+            port.setContainerPort(autoCD.getContainerPort());
+        } else {
+            port.setContainerPort(autoCD.getContainerPort());
+        }
+
+        port.setName("http");
+        return port;
+    }
+
+    private V1PersistentVolumeClaimSpec getV1PersistentVolumeClaimSpec(@NotNull Volume vol) {
+        return new V1PersistentVolumeClaimSpecBuilder()
+                .withAccessModes("ReadWriteOnce")
+                .withResources(new V1ResourceRequirementsBuilder()
+                        .withRequests(Map.of("storage", new Quantity(vol.getVolumeSize())))
+                        .build())
+                .withStorageClassName("do-block-storage")
+                .build();
+    }
+
+
+    @SuppressWarnings("DuplicatedCode")
+    private void deploy(AutoCD autoCD) {
+        var ingress = getIngress(autoCD);
+        deleteIngress(ingress);
+        var service = getService(autoCD);
+        deleteService(service);
+        var claims = getPersistentVolumeClaims(autoCD);
+        var pvs = protectPVS(autoCD, claims);
+        log.info(pvs.toString());
+        unprotectPVS(autoCD);
+        var deployment = getDeployment(autoCD);
+        deleteDeployment(deployment);
+        deleteClaims(claims);
+        var nameSpace = getNamespace();
+        cleanupPVC(nameSpace.getMetadata().getName(), claims);
+
+        createNamespace(nameSpace);
+        createClaims(claims);
+        createDeployment(deployment);
+        createService(service);
+
+        reclaimPVS(pvs);
+
+        if (autoCD.isPubliclyAccessible()) {
+            createIngress(ingress);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -167,34 +355,6 @@ public class K8sClient {
     @SuppressWarnings("unused")
     private void ignoreGoogleParsingError(JsonSyntaxException ignored) {
         //No-op
-    }
-
-    @SuppressWarnings("DuplicatedCode")
-    private void deploy(AutoCD autoCD) {
-        var ingress = getIngress(autoCD);
-        deleteIngress(ingress);
-        var service = getService(autoCD);
-        deleteService(service);
-        var claims = getPersistentVolumeClaims(autoCD);
-        var pvs = protectPVS(autoCD, claims);
-        log.info(pvs.toString());
-        unprotectPVS(autoCD);
-        var deployment = getDeployment(autoCD);
-        deleteDeployment(deployment);
-        deleteClaims(claims);
-        var nameSpace = getNamespace();
-        cleanupPVC(nameSpace.getMetadata().getName(), claims);
-
-        createNamespace(nameSpace);
-        createClaims(claims);
-        createDeployment(deployment);
-        createService(service);
-
-        reclaimPVS(pvs);
-
-        if (autoCD.isPubliclyAccessible()) {
-            createIngress(ingress);
-        }
     }
 
     /**
@@ -363,8 +523,6 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(deployment, this::createDeployment, e);
         }
-
-
     }
 
     private void createNamespace(V1Namespace nameSpace) {
@@ -383,6 +541,11 @@ public class K8sClient {
         return hash(str).substring(0, 20);
     }
 
+    @NotNull
+    private String getVolumeName(Volume volume, @NotNull AutoCD autoCD) {
+        return getPVCName(volume, autoCD);
+    }
+
     private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(@NotNull AutoCD autoCD) {
         return autoCD.getVolumes().stream().map(volume -> {
             var pvc = new V1PersistentVolumeClaim();
@@ -390,13 +553,7 @@ public class K8sClient {
             var meta = getNamespacedMeta();
             meta.setName(getPVCName(volume, autoCD));
             pvc.setMetadata(meta);
-            var spec = new V1PersistentVolumeClaimSpecBuilder()
-                    .withAccessModes("ReadWriteOnce")
-                    .withResources(new V1ResourceRequirementsBuilder()
-                            .withRequests(Map.of("storage", new Quantity(volume.getVolumeSize())))
-                            .build())
-                    .withStorageClassName("do-block-storage")
-                    .build();
+            V1PersistentVolumeClaimSpec spec = getV1PersistentVolumeClaimSpec(volume);
 
             pvc.setSpec(spec);
 
@@ -435,7 +592,7 @@ public class K8sClient {
                         .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
                                 .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
                                         .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
-                                                .withServiceName(getNamespaceString() + "-" + getName() + "-service")
+                                                .withServiceName(getServiceName(autoCD))
                                                 .withServicePort(new IntOrString(autoCD.getServicePort()))
                                                 .build())
                                         .build())
@@ -450,16 +607,20 @@ public class K8sClient {
     }
 
     @NotNull
+    private String getServiceName(@NotNull AutoCD autoCD) {
+        if (autoCD.getServiceName() != null) {
+            return autoCD.getServiceName();
+        }
+
+        return getNamespaceString() + "-" + getName() + "-service";
+    }
+
+    @NotNull
     private V1Service getService(@NotNull AutoCD autoCD) {
         var service = new V1Service();
         service.setKind("Service");
         var meta = getNamespacedMeta();
-        if (autoCD.getServiceName() != null) {
-            meta.setName(autoCD.getServiceName());
-        } else {
-            meta.setName(getNamespaceString() + "-" + getName() + "-service");
-        }
-
+        meta.setName(getServiceName(autoCD));
         var spec = new V1ServiceSpec();
         spec.setSelector(Map.of("k8s-app", getK8sApp(autoCD)));
         var port = new V1ServicePort();
@@ -475,11 +636,6 @@ public class K8sClient {
     }
 
     @NotNull
-    private String getK8sApp(@NotNull AutoCD autoCD) {
-        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
-    }
-
-    @NotNull
     private ExtensionsV1beta1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
@@ -488,7 +644,7 @@ public class K8sClient {
         meta.setLabels(labels);
 
         var spec = new ExtensionsV1beta1DeploymentSpec();
-        spec.setReplicas(1);
+        spec.setReplicas(autoCD.getReplicas());
         var select = new V1LabelSelector();
         select.setMatchLabels(labels);
         spec.setSelector(select);
@@ -516,25 +672,10 @@ public class K8sClient {
                 source.setClaimName(getPVCName(volume, autoCD));
                 vol.setPersistentVolumeClaim(source);
                 return vol;
-
             }).collect(Collectors.toList()));
         }
 
-        var port = new V1ContainerPort();
-
-        if (finder.getFileType().equals(FileType.VUE)) {
-            port.setContainerPort(autoCD.getContainerPort());
-        } else {
-            port.setContainerPort(autoCD.getContainerPort());
-        }
-
-        port.setName("http");
-
-        var containerBuilder = new V1ContainerBuilder()
-                .withImage(autoCD.getRegistryImagePath())
-                .withName(getName() + "-c")
-                .withPorts(port)
-                .withArgs(autoCD.getArgs());
+        V1ContainerBuilder containerBuilder = getV1ContainerBuilder(autoCD);
 
         var neededInitContainer = new ArrayList<V1Container>();
         if (!autoCD.getVolumes().isEmpty()) {
@@ -543,8 +684,8 @@ public class K8sClient {
                 vol.setName(getPVCName(volume, autoCD));
                 vol.setMountPath(volume.getVolumeMount());
 
-                if (volume.getFilePermission() != null) {
-                    neededInitContainer.add(getVolumePermissionConditioner(volume.getFilePermission(), vol));
+                if (volume.getFolderPermission() != null) {
+                    neededInitContainer.add(getVolumePermissionConditioner(volume.getFolderPermission(), vol));
                 }
 
                 return vol;
@@ -569,8 +710,23 @@ public class K8sClient {
         dep.setMetadata(meta);
         dep.setSpec(spec);
         dep.setKind("Deployment");
-        dep.setApiVersion(getApiVersion());
+        dep.setApiVersion(getApiVersionExtensionV1Beta1());
         return dep;
+    }
+
+    private V1ContainerBuilder getV1ContainerBuilder(@NotNull AutoCD autoCD) {
+        V1ContainerPort port = getV1ContainerPort(autoCD);
+
+        return new V1ContainerBuilder()
+                .withImage(autoCD.getRegistryImagePath())
+                .withName(getName() + "-c")
+                .withPorts(port)
+                .withArgs(autoCD.getArgs());
+    }
+
+    @NotNull
+    private String getK8sApp(@NotNull AutoCD autoCD) {
+        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
     }
 
     /**
@@ -597,8 +753,14 @@ public class K8sClient {
 
     @NotNull
     @Contract(pure = true)
-    private String getApiVersion() {
+    private String getApiVersionExtensionV1Beta1() {
         return "extensions/v1beta1";
+    }
+
+    @NotNull
+    @Contract(pure = true)
+    private String getApiVersionAppsV1() {
+        return "apps/v1";
     }
 
     @NotNull
@@ -642,7 +804,7 @@ public class K8sClient {
 
     // this code is duplicated because of our checkstyle configuration...
     @SuppressWarnings("DuplicatedCode")
-    public void removeFromK8s(AutoCD autoCD) {
+    public void removeDeploymentFromK8s(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
         deleteIngress(ingress);
         var service = getService(autoCD);

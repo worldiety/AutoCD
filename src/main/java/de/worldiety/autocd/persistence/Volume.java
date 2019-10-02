@@ -6,13 +6,13 @@ import org.jetbrains.annotations.Contract;
 public class Volume {
     private String volumeMount;
     private String volumeSize = "1Gi";
-    private String filePermission;
+    private String folderPermission;
     private boolean retainVolume = true;
 
-    public Volume(String volumeMount, String volumeSize, String filePermission, boolean retainVolume) {
+    public Volume(String volumeMount, String volumeSize, String folderPermission, boolean retainVolume) {
         this.volumeMount = volumeMount;
         this.volumeSize = volumeSize;
-        this.filePermission = filePermission;
+        this.folderPermission = folderPermission;
         this.retainVolume = retainVolume;
     }
 
@@ -28,12 +28,12 @@ public class Volume {
         this.retainVolume = retainVolume;
     }
 
-    public String getFilePermission() {
-        return filePermission;
+    public String getFolderPermission() {
+        return folderPermission;
     }
 
-    public void setFilePermission(String filePermission) {
-        this.filePermission = filePermission;
+    public void setFolderPermission(String folderPermission) {
+        this.folderPermission = folderPermission;
     }
 
     @Override

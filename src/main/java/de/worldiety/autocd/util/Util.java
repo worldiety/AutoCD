@@ -31,9 +31,9 @@ public class Util {
     }
 
 
-    public static void pushDockerAndSetPath(File dockerfile, AutoCD autoCD) {
+    public static void pushDockerAndSetPath(File dockerfile, AutoCD autoCD, String buildType) {
         var dockerClient = new Docker();
-        var tag = dockerClient.buildAndPushImageFromFile(dockerfile);
+        var tag = dockerClient.buildAndPushImageFromFile(dockerfile, buildType);
         autoCD.setRegistryImagePath(tag);
     }
 

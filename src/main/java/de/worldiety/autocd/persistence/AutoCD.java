@@ -7,29 +7,29 @@ import java.util.Map;
 public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
+    private int replicas = 1;
     private boolean publiclyAccessible = true;
     private long terminationGracePeriod = 60L;
     private String dockerImagePath;
     private String registryImagePath;
     private String subdomain;
     private boolean shouldHost = true;
-    private String command;
     private List<Volume> volumes = new ArrayList<>();
     private Map<String, String> environmentVariables;
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
 
-    public AutoCD(int containerPort, int servicePort, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, String command, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
+    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, List<Volume> volumes, Map<String, String> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
+        this.replicas = replicas;
         this.publiclyAccessible = publiclyAccessible;
         this.terminationGracePeriod = terminationGracePeriod;
         this.dockerImagePath = dockerImagePath;
         this.registryImagePath = registryImagePath;
         this.subdomain = subdomain;
         this.shouldHost = shouldHost;
-        this.command = command;
         this.volumes = volumes;
         this.environmentVariables = environmentVariables;
         this.otherImages = otherImages;
@@ -40,12 +40,12 @@ public class AutoCD {
     public AutoCD() {
     }
 
-    public String getCommand() {
-        return command;
+    public int getReplicas() {
+        return replicas;
     }
 
-    public void setCommand(String command) {
-        this.command = command;
+    public void setReplicas(int replicas) {
+        this.replicas = replicas;
     }
 
     public List<String> getArgs() {

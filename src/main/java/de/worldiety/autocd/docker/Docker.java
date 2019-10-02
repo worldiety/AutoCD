@@ -36,7 +36,7 @@ public class Docker {
         client = DockerClientBuilder.getInstance(config).build();
     }
 
-    public String buildAndPushImageFromFile(File configFile) {
+    public String buildAndPushImageFromFile(File configFile, String buildType) {
         var reg = System.getenv(Environment.CI_REGISTRY.toString());
         var projectName = System.getenv(Environment.CI_PROJECT_NAME.toString());
         var nameSpace = System.getenv(Environment.CI_PROJECT_NAMESPACE.toString());
@@ -45,7 +45,7 @@ public class Docker {
         projectName = projectName == null ? "default" : projectName;
         nameSpace = nameSpace == null ? "default" : nameSpace;
 
-        var tag = reg + "/" + nameSpace + "/" + projectName;
+        var tag = reg + "/" + nameSpace + "/" + projectName + ":" + buildType;
 
         log.info("creating image with tag " + tag);
 
