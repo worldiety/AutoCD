@@ -71,13 +71,13 @@ public class Main {
 
 
 
-        ApiClient strategicMergePatchClient =
-                ClientBuilder.standard()
+        ApiClient strategicMergePatchClient = ClientBuilder.standard()
                         .setBasePath(args[0])
                         .setVerifyingSsl(true)
                         .setAuthentication(new AccessTokenAuthentication(args[1]))
                         .setOverridePatchFormat(V1Patch.PATCH_FORMAT_JSON_PATCH)
-                        .build().setSslCaCert(new FileInputStream(args[2]));
+                        .build()
+                        .setSslCaCert(new FileInputStream(args[2]));
 
         CoreV1Api patchApi = new CoreV1Api(strategicMergePatchClient);
         CoreV1Api api = new CoreV1Api();

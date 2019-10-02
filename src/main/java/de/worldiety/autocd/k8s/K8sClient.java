@@ -57,22 +57,27 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-//TODO: comment propagation of deletion
 public class K8sClient {
     private static final Logger log = LoggerFactory.getLogger(K8sClient.class);
+    //This needs to be set on delete Operations that should propagate to the related objects
+    private static final String FOREGROUND = "Foreground";
     private final CoreV1Api api;
     private final DockerfileHandler finder;
-    private final String buildType;
+    private final String hyphenedBuildType;
     private final CoreV1Api patchApi;
 
     @Contract(pure = true)
-    public K8sClient(CoreV1Api api, DockerfileHandler finder, String buildType, CoreV1Api patchApi) {
+    public K8sClient(CoreV1Api api, DockerfileHandler finder, String hyphenedBuildType, CoreV1Api patchApi) {
         this.api = api;
         this.finder = finder;
-        this.buildType = "-" + buildType;
+        this.hyphenedBuildType = "-" + hyphenedBuildType;
         this.patchApi = patchApi;
     }
 
+    /**
+     * Deploys the given configuration the the Kubernetes Cluster
+     * @param autoCD configuration
+     */
     public void deployToK8s(AutoCD autoCD) {
         deploy(autoCD);
     }
@@ -80,7 +85,7 @@ public class K8sClient {
     @SuppressWarnings("unused")
     private void deleteNamespace(@NotNull V1Namespace namespace) {
         try {
-            api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, "Foreground");
+            api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
             log.warn("Could not delete namespace", e);
         } catch (JsonSyntaxException e) {
@@ -96,9 +101,10 @@ public class K8sClient {
         claims.forEach(this::applyDeleteClaim);
     }
 
-    private void applyDeleteClaim(V1PersistentVolumeClaim claim) {
+
+    private void applyDeleteClaim(@NotNull V1PersistentVolumeClaim claim) {
         try {
-            api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
+            api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
             log.info("Deleted claim: " + claim.getMetadata().getName());
         } catch (ApiException e) {
             retry(claim, this::applyDeleteClaim, e);
@@ -120,7 +126,7 @@ public class K8sClient {
     private void deleteDeployment(@NotNull ExtensionsV1beta1Deployment deployment) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, "Foreground");
+            extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
             log.warn("Could not delete deployment", e);
         } catch (JsonSyntaxException e) {
@@ -130,7 +136,7 @@ public class K8sClient {
 
     private void deleteService(@NotNull V1Service service) {
         try {
-            api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
+            api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
             log.warn("Could not delete service", e);
         } catch (JsonSyntaxException e) {
@@ -141,7 +147,7 @@ public class K8sClient {
     private void deleteIngress(@NotNull ExtensionsV1beta1Ingress ingress) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, "Foreground");
+            extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
             log.error("Could not delete ingress", e);
         } catch (JsonSyntaxException e) {
@@ -150,6 +156,9 @@ public class K8sClient {
     }
 
     /**
+     * This needs to be caught since kubernetes sometimes returns a status OR the object, which results in a json parsing
+     * error.
+     *
      * https://github.com/kubernetes-client/java/issues/86
      *
      * @param ignored ignored
@@ -168,12 +177,12 @@ public class K8sClient {
         var claims = getPersistentVolumeClaims(autoCD);
         var pvs = protectPVS(autoCD, claims);
         log.info(pvs.toString());
-        unprotectPVS(autoCD, claims);
+        unprotectPVS(autoCD);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
         deleteClaims(claims);
         var nameSpace = getNamespace();
-        cleanupPVC(nameSpace.getMetadata().getName(), claims, autoCD);
+        cleanupPVC(nameSpace.getMetadata().getName(), claims);
 
         createNamespace(nameSpace);
         createClaims(claims);
@@ -187,7 +196,11 @@ public class K8sClient {
         }
     }
 
-    private void reclaimPVS(List<String> pvs) {
+    /**
+     * This method is used to remove the k8s reference of the "old" pod so it gets marked as "Available" again
+     * @param pvs names of the volumes to patch
+     */
+    private void reclaimPVS(@NotNull List<String> pvs) {
         pvs.forEach(pv -> {
             V1Patch reclaimPatch = new V1Patch("[{\"op\":\"remove\",\"path\":\"/spec/claimRef\"}]");
             try {
@@ -199,8 +212,13 @@ public class K8sClient {
         });
     }
 
-    private void unprotectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
-        V1PersistentVolumeList pvs = null;
+    /**
+     * This method removes the "Retain" protection that was added earlier if the volume has been set to:
+     * retainVolume = false
+     * @param autoCD configuration
+     */
+    private void unprotectPVS(AutoCD autoCD) {
+        V1PersistentVolumeList pvs;
         try {
             pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
             List<String> namesToProtect = getNamesToProtect(autoCD);
@@ -213,7 +231,7 @@ public class K8sClient {
 
                 V1Patch deletePatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Delete\"}]");
 
-                applyPatchToPVS(claims, pv, name, deletePatch);
+                applyPatchToPVS(pv, deletePatch);
             });
 
         } catch (ApiException e) {
@@ -222,7 +240,7 @@ public class K8sClient {
     }
 
     @NotNull
-    private List<String> getNamesToProtect(AutoCD autoCD) {
+    private List<String> getNamesToProtect(@NotNull AutoCD autoCD) {
         return autoCD.getVolumes()
                 .stream()
                 .filter(Volume::isRetainVolume)
@@ -230,18 +248,27 @@ public class K8sClient {
                 .collect(Collectors.toList());
     }
 
-    private void applyPatchToPVS(List<V1PersistentVolumeClaim> claims, V1PersistentVolume pv, String name, V1Patch patch) {
+    private void applyPatchToPVS(@NotNull V1PersistentVolume pv, V1Patch patch) {
         try {
             patchApi.patchPersistentVolume(pv.getMetadata().getName(), patch, null, null, null, null);
-
         } catch (ApiException e) {
             log.error("Could not patch PV", e);
             throw new IllegalStateException(e);
         }
     }
 
+    /**
+     * This methods adds the "Retain" policy to all volumes that have been configured via autoCD to retain their data.
+     * This is done so k8s doesn't propagate the deletion of the deployment to these Persistent Volumes. It also hardwires
+     * the name of the PersistentVolume into the PersistentVolumeClaim so it will try and grab the old one and not provision
+     * a new one
+     * @param autoCD configuration
+     * @param claims all pvc's generated from the autoCD
+     * @return the names of the Protected volumes to process later on
+     */
+    @NotNull
     private List<String> protectPVS(AutoCD autoCD, List<V1PersistentVolumeClaim> claims) {
-        V1PersistentVolumeList pvs = null;
+        V1PersistentVolumeList pvs;
         var strings = new ArrayList<String>();
         try {
             pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
@@ -257,7 +284,7 @@ public class K8sClient {
 
                 V1Patch retainPatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Retain\"}]");
 
-                applyPatchToPVS(claims, pv, name, retainPatch);
+                applyPatchToPVS(pv, retainPatch);
 
                 claims.stream().filter(it -> it.getMetadata().getName().equals(name)).forEach(it -> {
                     var spec = it.getSpec();
@@ -272,7 +299,13 @@ public class K8sClient {
         return strings;
     }
 
-    private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims, AutoCD autoCD) {
+    /**
+     * This method clears any "dangling" persistent volume claims that are not bound to any pod, this may occur if
+     * the user deletes a volume from the configuration and therefore it can no longer be found since the name is unknown
+     * @param namespace The namespace
+     * @param claims all claims to filter the correct ones
+     */
+    private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims) {
         try {
             var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, "true", null, null, null, null, null, null, null);
             var pods = api.listNamespacedPod(namespace, "true", null, null, null, null, null, null, null);
@@ -316,8 +349,6 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(service, this::createService, e);
         }
-
-
     }
 
     private void createDeployment(ExtensionsV1beta1Deployment deployment) {
@@ -341,12 +372,13 @@ public class K8sClient {
 
     }
 
-    private String getPVCName(Volume volume, AutoCD autoCD) {
+    @NotNull
+    private String getPVCName(Volume volume, @NotNull AutoCD autoCD) {
         var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
         return hash(str).substring(0, 20);
     }
 
-    private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(AutoCD autoCD) {
+    private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(@NotNull AutoCD autoCD) {
         return autoCD.getVolumes().stream().map(volume -> {
             var pvc = new V1PersistentVolumeClaim();
             pvc.setKind("PersistentVolumeClaim");
@@ -437,8 +469,9 @@ public class K8sClient {
         return service;
     }
 
-    private String getK8sApp(AutoCD autoCD) {
-        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + buildType;
+    @NotNull
+    private String getK8sApp(@NotNull AutoCD autoCD) {
+        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
     }
 
     @NotNull
@@ -535,7 +568,16 @@ public class K8sClient {
         return dep;
     }
 
-    private V1Container getVolumePermissionConditioner(String perm, V1VolumeMount vol) {
+    /**
+     * This method returns an init container that may be required to set the read/write/execute flags (as numbers) on
+     * a mount. This may be required for redis or mysql for example because those containers run as USER and the volumes
+     * only have read/write/execute as ROOT. This is needed because the DigitalOcean Spec doesn't implement setting these
+     * via configuration as per the docs: https://www.digitalocean.com/docs/kubernetes/how-to/add-volumes/#setting-permissions-on-volumes
+     * @param perm Unix Permissions
+     * @param vol the volumeMount to condition
+     * @return the initContainer used to condition the Volume
+     */
+    private V1Container getVolumePermissionConditioner(String perm, @NotNull V1VolumeMount vol) {
         return new V1ContainerBuilder()
                 .withImage("busybox")
                 .withName("busybox" + "-c")
@@ -553,12 +595,13 @@ public class K8sClient {
         return "extensions/v1beta1";
     }
 
+    @NotNull
     private String getName() {
         if (isLocal()) {
             return "local-default-name";
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + buildType;
+        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + hyphenedBuildType;
     }
 
 
@@ -569,6 +612,7 @@ public class K8sClient {
         return metadata;
     }
 
+    @NotNull
     private String getNamespaceString() {
         var nameSpaceName = "local-default";
 
@@ -577,7 +621,7 @@ public class K8sClient {
             nameSpaceName = nameSpaceName.replaceAll("/", "-");
         }
 
-        return nameSpaceName + buildType;
+        return nameSpaceName + hyphenedBuildType;
     }
 
     @NotNull
@@ -590,6 +634,7 @@ public class K8sClient {
         return ns;
     }
 
+     // this code is duplicated because of our checkstyle configuration...
     @SuppressWarnings("DuplicatedCode")
     public void removeFromK8s(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
@@ -602,6 +647,14 @@ public class K8sClient {
         deleteClaims(claims);
     }
 
+    /**
+     * This method will retry a given function if the resource is still in the "Terminating" phase. We need to catch this exception
+     * because the parsing of JSON responses is buggy: https://github.com/kubernetes-client/java/issues/86
+     * @param obj The object that will be passed to the function
+     * @param function the function that will be applied after sleeping
+     * @param e the caught exception
+     * @param <T> Any Kubernetes Object
+     */
     private <T> void retry(T obj, @NotNull Consumer<T> function, @NotNull ApiException e) {
         if (e.getMessage().equals("Conflict")) {
             var resp = new Gson().fromJson(e.getResponseBody(), KubeStatusResponse.class);
