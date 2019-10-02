@@ -76,6 +76,7 @@ public class K8sClient {
 
     /**
      * Deploys the given configuration the the Kubernetes Cluster
+     *
      * @param autoCD configuration
      */
     public void deployToK8s(AutoCD autoCD) {
@@ -158,7 +159,7 @@ public class K8sClient {
     /**
      * This needs to be caught since kubernetes sometimes returns a status OR the object, which results in a json parsing
      * error.
-     *
+     * <p>
      * https://github.com/kubernetes-client/java/issues/86
      *
      * @param ignored ignored
@@ -198,6 +199,7 @@ public class K8sClient {
 
     /**
      * This method is used to remove the k8s reference of the "old" pod so it gets marked as "Available" again
+     *
      * @param pvs names of the volumes to patch
      */
     private void reclaimPVS(@NotNull List<String> pvs) {
@@ -215,6 +217,7 @@ public class K8sClient {
     /**
      * This method removes the "Retain" protection that was added earlier if the volume has been set to:
      * retainVolume = false
+     *
      * @param autoCD configuration
      */
     private void unprotectPVS(AutoCD autoCD) {
@@ -262,6 +265,7 @@ public class K8sClient {
      * This is done so k8s doesn't propagate the deletion of the deployment to these Persistent Volumes. It also hardwires
      * the name of the PersistentVolume into the PersistentVolumeClaim so it will try and grab the old one and not provision
      * a new one
+     *
      * @param autoCD configuration
      * @param claims all pvc's generated from the autoCD
      * @return the names of the Protected volumes to process later on
@@ -302,8 +306,9 @@ public class K8sClient {
     /**
      * This method clears any "dangling" persistent volume claims that are not bound to any pod, this may occur if
      * the user deletes a volume from the configuration and therefore it can no longer be found since the name is unknown
+     *
      * @param namespace The namespace
-     * @param claims all claims to filter the correct ones
+     * @param claims    all claims to filter the correct ones
      */
     private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims) {
         try {
@@ -573,8 +578,9 @@ public class K8sClient {
      * a mount. This may be required for redis or mysql for example because those containers run as USER and the volumes
      * only have read/write/execute as ROOT. This is needed because the DigitalOcean Spec doesn't implement setting these
      * via configuration as per the docs: https://www.digitalocean.com/docs/kubernetes/how-to/add-volumes/#setting-permissions-on-volumes
+     *
      * @param perm Unix Permissions
-     * @param vol the volumeMount to condition
+     * @param vol  the volumeMount to condition
      * @return the initContainer used to condition the Volume
      */
     private V1Container getVolumePermissionConditioner(String perm, @NotNull V1VolumeMount vol) {
@@ -634,7 +640,7 @@ public class K8sClient {
         return ns;
     }
 
-     // this code is duplicated because of our checkstyle configuration...
+    // this code is duplicated because of our checkstyle configuration...
     @SuppressWarnings("DuplicatedCode")
     public void removeFromK8s(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
@@ -650,10 +656,11 @@ public class K8sClient {
     /**
      * This method will retry a given function if the resource is still in the "Terminating" phase. We need to catch this exception
      * because the parsing of JSON responses is buggy: https://github.com/kubernetes-client/java/issues/86
-     * @param obj The object that will be passed to the function
+     *
+     * @param obj      The object that will be passed to the function
      * @param function the function that will be applied after sleeping
-     * @param e the caught exception
-     * @param <T> Any Kubernetes Object
+     * @param e        the caught exception
+     * @param <T>      Any Kubernetes Object
      */
     private <T> void retry(T obj, @NotNull Consumer<T> function, @NotNull ApiException e) {
         if (e.getMessage().equals("Conflict")) {
