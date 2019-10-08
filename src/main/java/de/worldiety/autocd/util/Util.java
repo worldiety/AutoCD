@@ -11,7 +11,7 @@ import java.util.Objects;
 public class Util {
     public static final String CLOUDIETY_DOMAIN = ".cloudiety.de";
 
-    public static String buildSubdomain(String buildType) {
+    public static String buildSubdomain(String buildType, String hash) {
         if (isLocal()) {
             return "local-test" + CLOUDIETY_DOMAIN;
         }
@@ -21,6 +21,8 @@ public class Util {
                 System.getenv(Environment.CI_PROJECT_NAMESPACE.toString()).replaceAll("/", "--") +
                 "-" +
                 buildType +
+                "-" +
+                hash +
                 CLOUDIETY_DOMAIN;
     }
 

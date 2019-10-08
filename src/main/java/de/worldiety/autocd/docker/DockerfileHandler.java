@@ -73,7 +73,8 @@ public class DockerfileHandler {
             case "java":
                 return FileType.JAVA;
             case "vue":
-                return FileType.VUE;
+                var isNuxt = new File("nuxt.config.js").exists();
+                return isNuxt ? FileType.NUXT : FileType.VUE;
             default:
                 return FileType.OTHER;
         }

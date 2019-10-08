@@ -5,6 +5,7 @@ import static de.worldiety.autocd.util.Util.isLocal;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.annotations.SerializedName;
 import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.persistence.Volume;
@@ -45,6 +46,8 @@ import io.kubernetes.client.models.V1PersistentVolumeList;
 import io.kubernetes.client.models.V1PodSpec;
 import io.kubernetes.client.models.V1PodTemplateSpec;
 import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
+import io.kubernetes.client.models.V1Secret;
+import io.kubernetes.client.models.V1SecretBuilder;
 import io.kubernetes.client.models.V1Service;
 import io.kubernetes.client.models.V1ServicePort;
 import io.kubernetes.client.models.V1ServiceSpec;
@@ -54,7 +57,9 @@ import io.kubernetes.client.models.V1Volume;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -73,14 +78,16 @@ public class K8sClient {
     private final String hyphenedBuildType;
     private final String rawBuildType;
     private final CoreV1Api patchApi;
+    private final String dockerCredentials;
 
     @Contract(pure = true)
-    public K8sClient(CoreV1Api api, DockerfileHandler finder, String hyphenedBuildType, CoreV1Api patchApi) {
+    public K8sClient(CoreV1Api api, DockerfileHandler finder, String hyphenedBuildType, CoreV1Api patchApi, String dockerCredentials) {
         this.api = api;
         this.finder = finder;
         this.hyphenedBuildType = "-" + hyphenedBuildType;
         this.rawBuildType = hyphenedBuildType;
         this.patchApi = patchApi;
+        this.dockerCredentials = dockerCredentials;
     }
 
     /**
@@ -109,6 +116,7 @@ public class K8sClient {
         var nameSpace = getNamespace();
 
         createNamespace(nameSpace);
+        addSecret();
         createStatefulSet(set);
         createService(service);
         createIngress(ingress);
@@ -264,6 +272,7 @@ public class K8sClient {
         cleanupPVC(nameSpace.getMetadata().getName(), claims);
 
         createNamespace(nameSpace);
+        addSecret();
         createClaims(claims);
         createDeployment(deployment);
         createService(service);
@@ -275,12 +284,44 @@ public class K8sClient {
         }
     }
 
+    private void addSecret() {
+        var secret = new V1SecretBuilder().addToStringData(".dockerconfigjson", dockerCredentials)
+                .withKind("Secret")
+                .withMetadata(getNamedNamespacedMeta("gitlab-bot"))
+                .withType("kubernetes.io/dockerconfigjson")
+                .withApiVersion(getApiVersionV1())
+                .build();
+
+
+        /*Arrays.stream(V1Secret.class.getAnnotations())
+                .filter(it -> it.annotationType() == SerializedName.class)
+                .map(it -> ((SerializedName) it))
+                .filter(it -> it.value().equals("stringData"))
+                .forEach(it -> {
+                    try {
+                        var field = it.getClass().getDeclaredField("value");
+                        field.setAccessible(true);
+                        field.set(it, "data");
+                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                        // FIXME
+                        e.printStackTrace();
+                    }
+                });*/
+
+        System.out.println(new Gson().toJson(secret));
+        try {
+            api.createNamespacedSecret(secret.getMetadata().getNamespace(), secret, "true", null, null);
+        } catch (ApiException e) {
+            log.error("Could not create secret", e);
+        }
+    }
+
     @SuppressWarnings("unused")
     private void deleteNamespace(@NotNull V1Namespace namespace) {
         try {
             api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
-            log.warn("Could not delete namespace", e);
+            checkApiError(e, "namespace");
         } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
@@ -293,7 +334,6 @@ public class K8sClient {
     private void deleteClaims(@NotNull List<V1PersistentVolumeClaim> claims) {
         claims.forEach(this::applyDeleteClaim);
     }
-
 
     private void applyDeleteClaim(@NotNull V1PersistentVolumeClaim claim) {
         try {
@@ -321,7 +361,7 @@ public class K8sClient {
         try {
             extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
-            log.warn("Could not delete deployment", e);
+            checkApiError(e, "deployment");
         } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
@@ -331,7 +371,7 @@ public class K8sClient {
         try {
             api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
-            log.warn("Could not delete service", e);
+            checkApiError(e, "service");
         } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
@@ -342,7 +382,7 @@ public class K8sClient {
         try {
             extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
-            log.error("Could not delete ingress", e);
+            checkApiError(e, "ingress");
         } catch (JsonSyntaxException e) {
             ignoreGoogleParsingError(e);
         }
@@ -359,6 +399,12 @@ public class K8sClient {
     @SuppressWarnings("unused")
     private void ignoreGoogleParsingError(JsonSyntaxException ignored) {
         //No-op
+    }
+
+    private void checkApiError(ApiException e, String name) {
+        if (!e.getMessage().contains("Not found")) {
+            log.error("Could not delete " + name, e);
+        }
     }
 
     /**
@@ -391,14 +437,16 @@ public class K8sClient {
             List<String> namesToProtect = getNamesToProtect(autoCD);
 
             pvs.getItems().forEach(pv -> {
-                var name = pv.getSpec().getClaimRef().getName();
-                if (namesToProtect.contains(name)) {
-                    return;
+                if (pv.getSpec() != null && pv.getSpec().getClaimRef() != null) {
+                    var name = pv.getSpec().getClaimRef().getName();
+                    if (namesToProtect.contains(name)) {
+                        return;
+                    }
+
+                    V1Patch deletePatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Delete\"}]");
+
+                    applyPatchToPVS(pv, deletePatch);
                 }
-
-                V1Patch deletePatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Delete\"}]");
-
-                applyPatchToPVS(pv, deletePatch);
             });
 
         } catch (ApiException e) {
@@ -443,21 +491,24 @@ public class K8sClient {
             List<String> namesToProtect = getNamesToProtect(autoCD);
 
             pvs.getItems().forEach(pv -> {
-                var name = pv.getSpec().getClaimRef().getName();
-                if (!namesToProtect.contains(name)) {
-                    return;
+                if (pv.getSpec() != null && pv.getSpec().getClaimRef() != null) {
+                    var name = pv.getSpec().getClaimRef().getName();
+                    if (!namesToProtect.contains(name)) {
+                        return;
+                    }
+
+                    strings.add(pv.getMetadata().getName());
+
+                    V1Patch retainPatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Retain\"}]");
+
+                    applyPatchToPVS(pv, retainPatch);
+
+                    claims.stream().filter(it -> it.getMetadata().getName().equals(name)).forEach(it -> {
+                        var spec = it.getSpec();
+                        spec.setVolumeName(pv.getMetadata().getName());
+                    });
                 }
 
-                strings.add(pv.getMetadata().getName());
-
-                V1Patch retainPatch = new V1Patch("[{\"op\":\"replace\",\"path\":\"/spec/persistentVolumeReclaimPolicy\",\"value\":\"Retain\"}]");
-
-                applyPatchToPVS(pv, retainPatch);
-
-                claims.stream().filter(it -> it.getMetadata().getName().equals(name)).forEach(it -> {
-                    var spec = it.getSpec();
-                    spec.setVolumeName(pv.getMetadata().getName());
-                });
             });
 
         } catch (ApiException e) {
@@ -570,7 +621,7 @@ public class K8sClient {
         var ingress = new ExtensionsV1beta1Ingress();
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
-        meta.setName(getNamespaceString() + "-" + getName() + "-ingress");
+        meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getRegistryImagePath()).substring(0, 20));
 
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
@@ -721,11 +772,16 @@ public class K8sClient {
     private V1ContainerBuilder getV1ContainerBuilder(@NotNull AutoCD autoCD) {
         V1ContainerPort port = getV1ContainerPort(autoCD);
 
-        var variables = autoCD.getEnvironmentVariables().get(rawBuildType)
-                .entrySet()
-                .stream()
-                .map(entry -> new V1EnvVarBuilder().withName(entry.getKey()).withValue(entry.getValue()).build())
-                .collect(Collectors.toList());
+        List<V1EnvVar> variables = new ArrayList<>();
+        if (autoCD.getEnvironmentVariables() != null) {
+            var type = autoCD.getEnvironmentVariables().get(rawBuildType);
+            if (type != null) {
+                variables = type.entrySet()
+                        .stream()
+                        .map(entry -> new V1EnvVarBuilder().withName(entry.getKey()).withValue(entry.getValue()).build())
+                        .collect(Collectors.toList());
+            }
+        }
 
         return new V1ContainerBuilder()
                 .withImage(autoCD.getRegistryImagePath())
@@ -776,6 +832,12 @@ public class K8sClient {
     }
 
     @NotNull
+    @Contract(pure = true)
+    private String getApiVersionV1() {
+        return "v1";
+    }
+
+    @NotNull
     private String getName() {
         if (isLocal()) {
             return "local-default-name";
@@ -784,11 +846,16 @@ public class K8sClient {
         return System.getenv(Environment.CI_PROJECT_NAME.toString()) + hyphenedBuildType;
     }
 
-
     @NotNull
     private V1ObjectMeta getNamespacedMeta() {
         var metadata = new V1ObjectMeta();
         metadata.setNamespace(getNamespaceString());
+        return metadata;
+    }
+
+    private V1ObjectMeta getNamedNamespacedMeta(String name) {
+        var metadata = getNamespacedMeta();
+        metadata.setName(name);
         return metadata;
     }
 
@@ -855,8 +922,22 @@ public class K8sClient {
             }
         }
 
-
         log.error("Unknown error", e);
         log.info(e.getResponseBody());
     }
+
+    static class FixedV1Secret extends V1Secret {
+        @SerializedName("data")
+        private Map<String, String> data = null;
+
+        V1Secret putDataItem(String key, String dataInput) {
+            if (data == null) {
+                data = new HashMap<String, String>();
+            }
+
+            data.put(key, dataInput);
+            return this;
+        }
+    }
 }
+

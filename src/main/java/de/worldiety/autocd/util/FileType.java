@@ -3,7 +3,11 @@ package de.worldiety.autocd.util;
 import org.jetbrains.annotations.Contract;
 
 public enum FileType {
-    JAVA("java", "openjdk-12-builder", "openjdk-12-prod", "RUN ./gradlew build\n"), GO("go", "go-1.13-builder", "RUN go build -o app . \n"), VUE("vue", "vue-builder", "vue-prod", "RUN npm run build\n"), OTHER("other");
+    JAVA("java", "openjdk-12-builder", "openjdk-12-prod", "RUN ./gradlew build\n"),
+    GO("go", "go-1.13-builder", "RUN go build -o app . \n"),
+    VUE("vue", "vue-builder", "vue-prod", "RUN npm run build\n"),
+    NUXT("vue", "nuxt-builder", "nuxt-prod", "RUN npm i && npm run build"),
+    OTHER("other");
 
     private final String name;
     private String defaultBuild;

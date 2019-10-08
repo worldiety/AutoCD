@@ -1,0 +1,13 @@
+FROM node:12-alpine
+
+ENV HOST=0.0.0.0
+EXPOSE 3000
+
+COPY --from=builder /app/.nuxt/ /app/.nuxt/
+COPY --from=builder /app/static/ /app/static/
+COPY --from=builder /app/package*.json /app/
+WORKDIR /app
+
+RUN npm i
+
+CMD ["npm", "start"]

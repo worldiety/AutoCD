@@ -5,6 +5,7 @@ import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.k8s.K8sClient;
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.persistence.Volume;
+import de.worldiety.autocd.util.DockerconfigBuilder;
 import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
@@ -19,6 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +65,7 @@ public class Main {
         }
 
         if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
-            autoCD.setSubdomain(Util.buildSubdomain(buildType));
+            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getRegistryImagePath()).substring(0, 5)));
         }
 
         if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
@@ -79,9 +81,15 @@ public class Main {
                 .build()
                 .setSslCaCert(new FileInputStream(args[2]));
 
+        var dockerCredentials = DockerconfigBuilder.getDockerConfig(
+                System.getenv(Environment.CI_REGISTRY.toString()),
+                System.getenv(Environment.K8S_REGISTRY_USER_NAME.toString()),
+                System.getenv(Environment.K8S_REGISTRY_USER_TOKEN.toString())
+        );
+
         CoreV1Api patchApi = new CoreV1Api(strategicMergePatchClient);
         CoreV1Api api = new CoreV1Api();
-        var k8sClient = new K8sClient(api, finder, buildType, patchApi);
+        var k8sClient = new K8sClient(api, finder, buildType, patchApi, dockerCredentials);
         if (!autoCD.isShouldHost()) {
             removeWithDependencies(autoCD, k8sClient);
             log.info("Service is being removed from k8s.");
@@ -89,7 +97,7 @@ public class Main {
         }
 
 
-        deployWithDependencies(autoCD, k8sClient);
+        deployWithDependencies(autoCD, k8sClient, buildType);
         log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
     }
 
@@ -114,12 +122,16 @@ public class Main {
         }
     }
 
-    private static void deployWithDependencies(AutoCD autoCD, K8sClient k8sClient) {
+    private static void deployWithDependencies(AutoCD autoCD, K8sClient k8sClient, String buildType) {
         validateConfig(autoCD);
         if (!autoCD.getOtherImages().isEmpty()) {
             autoCD.getOtherImages().forEach(config -> {
+                if (config.getSubdomain() == null || config.getSubdomain().isEmpty()) {
+                    config.setSubdomain(Util.buildSubdomain(buildType, Util.hash(config.getRegistryImagePath()).substring(0, 5)));
+                }
+
                 if (!config.getOtherImages().isEmpty()) {
-                    deployWithDependencies(config, k8sClient);
+                    deployWithDependencies(config, k8sClient, buildType);
                 }
                 setServiceNameForOtherImages(autoCD, config);
                 k8sClient.deployToK8s(config);

@@ -1,6 +1,7 @@
 package de.worldiety.autocd.persistence;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +16,7 @@ public class AutoCD {
     private String subdomain;
     private boolean shouldHost = true;
     private List<Volume> volumes = new ArrayList<>();
-    private Map<String, Map<String, String>> environmentVariables;
+    private Map<String, Map<String, String>> environmentVariables = new HashMap<>();
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
