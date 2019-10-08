@@ -5,7 +5,6 @@ import static de.worldiety.autocd.util.Util.isLocal;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
-import com.google.gson.annotations.SerializedName;
 import de.worldiety.autocd.docker.DockerfileHandler;
 import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.persistence.Volume;
@@ -46,7 +45,6 @@ import io.kubernetes.client.models.V1PersistentVolumeList;
 import io.kubernetes.client.models.V1PodSpec;
 import io.kubernetes.client.models.V1PodTemplateSpec;
 import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
-import io.kubernetes.client.models.V1Secret;
 import io.kubernetes.client.models.V1SecretBuilder;
 import io.kubernetes.client.models.V1Service;
 import io.kubernetes.client.models.V1ServicePort;
@@ -57,9 +55,7 @@ import io.kubernetes.client.models.V1Volume;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -292,23 +288,6 @@ public class K8sClient {
                 .withApiVersion(getApiVersionV1())
                 .build();
 
-
-        /*Arrays.stream(V1Secret.class.getAnnotations())
-                .filter(it -> it.annotationType() == SerializedName.class)
-                .map(it -> ((SerializedName) it))
-                .filter(it -> it.value().equals("stringData"))
-                .forEach(it -> {
-                    try {
-                        var field = it.getClass().getDeclaredField("value");
-                        field.setAccessible(true);
-                        field.set(it, "data");
-                    } catch (NoSuchFieldException | IllegalAccessException e) {
-                        // FIXME
-                        e.printStackTrace();
-                    }
-                });*/
-
-        System.out.println(new Gson().toJson(secret));
         try {
             api.createNamespacedSecret(secret.getMetadata().getNamespace(), secret, "true", null, null);
         } catch (ApiException e) {
@@ -924,20 +903,6 @@ public class K8sClient {
 
         log.error("Unknown error", e);
         log.info(e.getResponseBody());
-    }
-
-    static class FixedV1Secret extends V1Secret {
-        @SerializedName("data")
-        private Map<String, String> data = null;
-
-        V1Secret putDataItem(String key, String dataInput) {
-            if (data == null) {
-                data = new HashMap<String, String>();
-            }
-
-            data.put(key, dataInput);
-            return this;
-        }
     }
 }
 

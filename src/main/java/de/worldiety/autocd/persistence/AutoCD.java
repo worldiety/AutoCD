@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+//TODO: registryImage identifier only match name, not tag
 public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
@@ -13,18 +14,16 @@ public class AutoCD {
     private long terminationGracePeriod = 60L;
     private String dockerImagePath;
     private String registryImagePath;
-    private String subdomain;
+    private Map<String, String> subdomains = new HashMap<>();
     private boolean shouldHost = true;
     private List<Volume> volumes = new ArrayList<>();
     private Map<String, Map<String, String>> environmentVariables = new HashMap<>();
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
+    private String subdomain;
 
-    public AutoCD() {
-    }
-
-    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, String subdomain, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName) {
+    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, Map<String, String> subdomains, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName, String subdomain) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.replicas = replicas;
@@ -32,13 +31,25 @@ public class AutoCD {
         this.terminationGracePeriod = terminationGracePeriod;
         this.dockerImagePath = dockerImagePath;
         this.registryImagePath = registryImagePath;
-        this.subdomain = subdomain;
+        this.subdomains = subdomains;
         this.shouldHost = shouldHost;
         this.volumes = volumes;
         this.environmentVariables = environmentVariables;
         this.otherImages = otherImages;
         this.args = args;
         this.serviceName = serviceName;
+        this.subdomain = subdomain;
+    }
+
+    public AutoCD() {
+    }
+
+    public String getSubdomain() {
+        return subdomain;
+    }
+
+    public void setSubdomain(String subdomain) {
+        this.subdomain = subdomain;
     }
 
     public int getReplicas() {
@@ -81,6 +92,14 @@ public class AutoCD {
         this.terminationGracePeriod = terminationGracePeriod;
     }
 
+    public Map<String, String> getSubdomains() {
+        return subdomains;
+    }
+
+    public void setSubdomains(Map<String, String> subdomains) {
+        this.subdomains = subdomains;
+    }
+
     public boolean isPubliclyAccessible() {
         return publiclyAccessible;
     }
@@ -103,14 +122,6 @@ public class AutoCD {
 
     public void setEnvironmentVariables(Map<String, Map<String, String>> environmentVariables) {
         this.environmentVariables = environmentVariables;
-    }
-
-    public String getSubdomain() {
-        return subdomain;
-    }
-
-    public void setSubdomain(String subdomain) {
-        this.subdomain = subdomain;
     }
 
     public int getServicePort() {

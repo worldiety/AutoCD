@@ -20,7 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.Base64;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,9 +64,7 @@ public class Main {
             }
         }
 
-        if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
-            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getRegistryImagePath()).substring(0, 5)));
-        }
+        populateSubdomain(autoCD, buildType, autoCD.getSubdomains());
 
         if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
             autoCD.setContainerPort(80);
@@ -101,6 +99,16 @@ public class Main {
         log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
     }
 
+    private static void populateSubdomain(AutoCD autoCD, String buildType, Map<String, String> subdomains) {
+        if (autoCD.getSubdomains() != null && subdomains.keySet().size() != 0) {
+            autoCD.setSubdomain(autoCD.getSubdomains().get(buildType));
+        }
+
+        if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
+            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getRegistryImagePath()).substring(0, 5)));
+        }
+    }
+
     private static void removeWithDependencies(AutoCD autoCD, K8sClient k8sClient) {
         if (!autoCD.getOtherImages().isEmpty()) {
             autoCD.getOtherImages().forEach(config -> {
@@ -126,9 +134,7 @@ public class Main {
         validateConfig(autoCD);
         if (!autoCD.getOtherImages().isEmpty()) {
             autoCD.getOtherImages().forEach(config -> {
-                if (config.getSubdomain() == null || config.getSubdomain().isEmpty()) {
-                    config.setSubdomain(Util.buildSubdomain(buildType, Util.hash(config.getRegistryImagePath()).substring(0, 5)));
-                }
+                populateSubdomain(config, buildType, autoCD.getSubdomains());
 
                 if (!config.getOtherImages().isEmpty()) {
                     deployWithDependencies(config, k8sClient, buildType);
