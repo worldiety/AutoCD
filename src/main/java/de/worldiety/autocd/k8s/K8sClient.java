@@ -259,6 +259,7 @@ public class K8sClient {
         deleteService(service);
         var claims = getPersistentVolumeClaims(autoCD);
         var pvs = protectPVS(autoCD, claims);
+        log.info(pvs.toString());
         unprotectPVS(autoCD);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
@@ -567,6 +568,8 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(nameSpace, this::createNamespace, e);
         }
+
+
     }
 
     @NotNull
