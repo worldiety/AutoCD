@@ -28,11 +28,14 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
+    private static final int KUBERNETES_URL = 0;
+    private static final int KUBERNETES_TOKEN = 1;
+    private static final int CA_CERTIFICATE = 2;
+    private static final int BUILD_TYPE = 3;
 
-    //TODO: arguments naming
     public static void main(String[] args) throws IOException {
         ApiClient client;
-        client = Config.fromToken(args[0], args[1]).setSslCaCert(new FileInputStream(args[2]));
+        client = Config.fromToken(args[KUBERNETES_URL], args[KUBERNETES_TOKEN]).setSslCaCert(new FileInputStream(args[CA_CERTIFICATE]));
         Configuration.setDefaultApiClient(client);
 
         String name = "autocd.json";
@@ -55,7 +58,7 @@ public class Main {
 
         String buildType;
         if (args.length == 4) {
-            buildType = args[3];
+            buildType = args[BUILD_TYPE];
         } else {
             buildType = "dev";
         }
