@@ -18,58 +18,26 @@ import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.credentials.AccessTokenAuthentication;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
+    //TODO: arguments naming
     public static void main(String[] args) throws IOException {
-        DockerfileHandler finder = new DockerfileHandler(".");
         ApiClient client;
-
-
         client = Config.fromToken(args[0], args[1]).setSslCaCert(new FileInputStream(args[2]));
         Configuration.setDefaultApiClient(client);
 
-        var autocdConfigFile = new File("autocd.json");
-        AutoCD autoCD;
-        if (!autocdConfigFile.exists()) {
-            autoCD = new AutoCD();
-        } else {
-            Gson gson = new Gson();
-            autoCD = gson.fromJson(new FileReader(autocdConfigFile), AutoCD.class);
-        }
-
-
-        String buildType;
-        if (args.length == 4) {
-            buildType = args[3];
-        } else {
-            buildType = "dev";
-        }
-
-        if (autoCD.getRegistryImagePath() == null || autoCD.getRegistryImagePath().isEmpty()) {
-            var dockerFile = new File("Dockerfile");
-
-            if (!dockerFile.exists()) {
-                finder.findDockerConfig().ifPresent(config -> {
-                    Util.pushDockerAndSetPath(config, autoCD, buildType);
-                });
-            } else {
-                Util.pushDockerAndSetPath(dockerFile.getAbsoluteFile(), autoCD, buildType);
-            }
-        }
-
-        populateSubdomain(autoCD, buildType, autoCD.getSubdomains());
-
-        if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
-            autoCD.setContainerPort(80);
-        }
-
+        String name = "autocd.json";
+        var autoCD = getAutoCD(name, true);
+        var oldAutoCD = getAutoCD("oldautocd.json", false);
 
         ApiClient strategicMergePatchClient = ClientBuilder.standard()
                 .setBasePath(args[0])
@@ -85,18 +53,86 @@ public class Main {
                 System.getenv(Environment.K8S_REGISTRY_USER_TOKEN.toString())
         );
 
+        String buildType;
+        if (args.length == 4) {
+            buildType = args[3];
+        } else {
+            buildType = "dev";
+        }
+
+        DockerfileHandler finder = new DockerfileHandler(".");
+
         CoreV1Api patchApi = new CoreV1Api(strategicMergePatchClient);
         CoreV1Api api = new CoreV1Api();
         var k8sClient = new K8sClient(api, finder, buildType, patchApi, dockerCredentials);
+
+        if (oldAutoCD != null) {
+            var validImageNames = autoCD.getOtherImages().stream()
+                    .map(AutoCD::getRegistryImagePath)
+                    .collect(Collectors.toList());
+
+            var containsInvalidImages = oldAutoCD.getOtherImages()
+                    .stream()
+                    .map(AutoCD::getRegistryImagePath)
+                    .anyMatch(o -> !validImageNames.contains(o));
+
+            if (containsInvalidImages) {
+                oldAutoCD.getOtherImages().forEach(image -> {
+                    setServiceNameForOtherImages(oldAutoCD, image);
+                    removeWithDependencies(image, k8sClient);
+                });
+            }
+        }
+
+        populateRegistryImagePath(autoCD, buildType, finder);
+        populateSubdomain(autoCD, buildType, autoCD.getSubdomains());
+        populateContainerPort(autoCD, finder);
+
+
         if (!autoCD.isShouldHost()) {
-            removeWithDependencies(autoCD, k8sClient);
-            log.info("Service is being removed from k8s.");
+            if (oldAutoCD != null && oldAutoCD.isShouldHost()) {
+                log.info("Service is being removed from k8s.");
+                removeWithDependencies(autoCD, k8sClient);
+            }
+
+            log.info("Not deploying to k8s because autocd is set to no hosting");
             return;
         }
 
-
         deployWithDependencies(autoCD, k8sClient, buildType);
         log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
+    }
+
+    private static void populateContainerPort(AutoCD autoCD, DockerfileHandler finder) {
+        if (autoCD.getContainerPort() == 8080 && finder.getFileType().equals(FileType.VUE)) {
+            autoCD.setContainerPort(80);
+        }
+    }
+
+    private static void populateRegistryImagePath(AutoCD autoCD, String buildType, DockerfileHandler finder) {
+        if (autoCD.getRegistryImagePath() == null || autoCD.getRegistryImagePath().isEmpty()) {
+            var dockerFile = new File("Dockerfile");
+
+            if (!dockerFile.exists()) {
+                finder.findDockerConfig().ifPresent(config -> {
+                    Util.pushDockerAndSetPath(config, autoCD, buildType);
+                });
+            } else {
+                Util.pushDockerAndSetPath(dockerFile.getAbsoluteFile(), autoCD, buildType);
+            }
+        }
+    }
+
+    private static AutoCD getAutoCD(String name, boolean createIfNotExists) throws FileNotFoundException {
+        var autocdConfigFile = new File(name);
+        AutoCD autoCD;
+        if (!autocdConfigFile.exists() && createIfNotExists) {
+            autoCD = new AutoCD();
+        } else {
+            Gson gson = new Gson();
+            autoCD = gson.fromJson(new FileReader(autocdConfigFile), AutoCD.class);
+        }
+        return autoCD;
     }
 
     private static void populateSubdomain(AutoCD autoCD, String buildType, Map<String, String> subdomains) {
@@ -105,7 +141,7 @@ public class Main {
         }
 
         if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
-            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getRegistryImagePath()).substring(0, 5)));
+            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getIdentifierRegistryImagePath()).substring(0, 5)));
         }
     }
 
@@ -125,7 +161,7 @@ public class Main {
     private static void setServiceNameForOtherImages(AutoCD main, AutoCD other) {
         if (other.getServiceName() == null) {
             other.setServiceName(Util.hash(
-                    System.getenv(Environment.CI_PROJECT_NAME.toString()) + main.getRegistryImagePath()).substring(0, 20)
+                    System.getenv(Environment.CI_PROJECT_NAME.toString()) + main.getIdentifierRegistryImagePath()).substring(0, 20)
             );
         }
     }

@@ -148,7 +148,7 @@ public class K8sClient {
     private V1StatefulSet getStatefulSet(AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
-        meta.setName(Util.hash(getNamespaceString() + autoCD.getRegistryImagePath() + projName).substring(0, 20));
+        meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName).substring(0, 20));
         var labels = Map.of("k8s-app", getK8sApp(autoCD));
         meta.setLabels(labels);
 
@@ -259,7 +259,6 @@ public class K8sClient {
         deleteService(service);
         var claims = getPersistentVolumeClaims(autoCD);
         var pvs = protectPVS(autoCD, claims);
-        log.info(pvs.toString());
         unprotectPVS(autoCD);
         var deployment = getDeployment(autoCD);
         deleteDeployment(deployment);
@@ -280,6 +279,9 @@ public class K8sClient {
         }
     }
 
+    /**
+     * Adds the image pull secret to the namespace
+     */
     private void addSecret() {
         var secret = new V1SecretBuilder().addToStringData(".dockerconfigjson", dockerCredentials)
                 .withKind("Secret")
@@ -565,13 +567,11 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(nameSpace, this::createNamespace, e);
         }
-
-
     }
 
     @NotNull
     private String getPVCName(Volume volume, @NotNull AutoCD autoCD) {
-        var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
+        var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getIdentifierRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
         return hash(str).substring(0, 20);
     }
 
@@ -600,7 +600,7 @@ public class K8sClient {
         var ingress = new ExtensionsV1beta1Ingress();
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
-        meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getRegistryImagePath()).substring(0, 20));
+        meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
 
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
@@ -617,7 +617,7 @@ public class K8sClient {
             }
 
         } catch (ApiException e) {
-            e.printStackTrace();
+            log.error("Could not get Ingresses for all namespaces", e);
         }
 
         var spec = new ExtensionsV1beta1IngressSpecBuilder()
@@ -673,7 +673,7 @@ public class K8sClient {
     private ExtensionsV1beta1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
-        meta.setName(Util.hash(getNamespaceString() + autoCD.getRegistryImagePath() + projName));
+        meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName));
         var labels = Map.of("k8s-app", getK8sApp(autoCD));
         meta.setLabels(labels);
 
@@ -773,7 +773,7 @@ public class K8sClient {
 
     @NotNull
     private String getK8sApp(@NotNull AutoCD autoCD) {
-        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
+        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getIdentifierRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
     }
 
     /**

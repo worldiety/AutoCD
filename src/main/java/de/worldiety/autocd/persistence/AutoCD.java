@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-//TODO: registryImage identifier only match name, not tag
 public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
@@ -134,6 +133,10 @@ public class AutoCD {
 
     public String getRegistryImagePath() {
         return registryImagePath;
+    }
+
+    public String getIdentifierRegistryImagePath() {
+        return registryImagePath.split(":")[0];
     }
 
     public void setRegistryImagePath(String registryImagePath) {

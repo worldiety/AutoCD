@@ -4,11 +4,9 @@ import de.worldiety.autocd.util.FileType;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -99,7 +97,7 @@ public class DockerfileHandler {
         return opt.map(ftype -> {
             var customBuildsh = new File("build.sh");
             var nFile = new File("Dockerfile");
-            System.out.println(nFile);
+
             try {
                 var fout = new FileOutputStream(nFile);
 
