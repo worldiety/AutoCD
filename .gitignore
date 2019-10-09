@@ -26,3 +26,4 @@ nbdist/
 ### Custom ###
 Dockerfile
 *.jar
+.DS_Store
