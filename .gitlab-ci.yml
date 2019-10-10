@@ -11,7 +11,7 @@ stages:
   script:
     - ./gradlew clean jar
     - echo ${AUTOCD_URL}
-    - curl -vLX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
+    - curl -vfLX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
   tags:
     - docker-build-runner
 
