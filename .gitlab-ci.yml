@@ -6,6 +6,8 @@ stages:
 
 deploy-prod:
   stage: deploy-prod
+  before_script:
+    - apk add curl
   script:
     - ./gradlew clean jar
     - curl -LX POST autocd.cloudiety.de -F token=utTEfVmghCnMfq99MZ4W -F autocd=@build/libs/AutoCD-1.0.jar
@@ -14,6 +16,8 @@ deploy-prod:
 
 deploy-dev:
   stage: deploy-dev
+  before_script:
+    - apk add curl
   script:
     - ./gradlew clean jar
     - curl -LX POST autocd-dev.cloudiety.de -F token=W8LpB6L8fkWZFwACtKcv -F autocd=@build/libs/AutoCD-1.0.jar
