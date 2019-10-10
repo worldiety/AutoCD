@@ -4,22 +4,30 @@ stages:
   - deploy-prod
   - deploy-dev
 
-deploy-prod:
-  stage: deploy-prod
+.deploy:
+  stage: deploy
   before_script:
     - apk add curl
   script:
     - ./gradlew clean jar
-    - curl -LX POST autocd.cloudiety.de -F token=utTEfVmghCnMfq99MZ4W -F autocd=@build/libs/AutoCD-1.0.jar
+    - curl -LX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
+  tags:
+    - docker-build-runner
+
+deploy-prod:
+  stage: deploy-prod
+  extends: .deploy
+  variables:
+    AUTOCD_URL: autocd.cloudiety.de
+    AUTOCD_TOKEN: ${PROD_TOKEN}
   only:
     - master
 
 deploy-dev:
   stage: deploy-dev
-  before_script:
-    - apk add curl
-  script:
-    - ./gradlew clean jar
-    - curl -LX POST autocd-dev.cloudiety.de -F token=W8LpB6L8fkWZFwACtKcv -F autocd=@build/libs/AutoCD-1.0.jar
+  extends: .deploy
+  variables:
+    AUTOCD_URL: autocd-dev.cloudiety.de
+    AUTOCD_TOKEN: ${DEV_TOKEN}
   only:
     - develop
