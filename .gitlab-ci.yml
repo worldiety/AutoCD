@@ -1,16 +1,21 @@
 image: openjdk:12-alpine
 
 stages:
-  - build
+  - deploy-prod
+  - deploy-dev
 
-build:
-  stage: build
-
+deploy-prod:
+  stage: deploy-prod
   script:
-    - ./gradlew -x clean jar
-  artifacts:
-    paths:
-      - build/libs/*.jar
-    expire_in: 1 week
+    - ./gradlew clean jar
+    - curl -LX POST autocd.cloudiety.de -F token=utTEfVmghCnMfq99MZ4W -F autocd=@build/libs/AutoCD-1.0.jar
   only:
     - master
+
+deploy-dev:
+  stage: deploy-dev
+  script:
+    - ./gradlew clean jar
+    - curl -LX POST autocd-dev.cloudiety.de -F token=W8LpB6L8fkWZFwACtKcv -F autocd=@build/libs/AutoCD-1.0.jar
+  only:
+    - develop
