@@ -649,7 +649,7 @@ public class K8sClient {
             return autoCD.getServiceName();
         }
 
-        return Util.hash(getNamespaceString() + "-" + getName() + "-service").substring(0, 20);
+        return "service-" + Util.hash(getNamespaceString() + "-" + getName() + "-service").substring(0, 20);
     }
 
     @NotNull
