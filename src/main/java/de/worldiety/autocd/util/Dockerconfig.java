@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class Dockerconfig {
     @SerializedName("auths")
-    private final Map<String, AuthItem>  authItems;
+    private final Map<String, AuthItem> authItems;
 
     public Dockerconfig(Map<String, AuthItem> authItems) {
         this.authItems = authItems;

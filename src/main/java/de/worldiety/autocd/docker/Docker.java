@@ -9,7 +9,6 @@ import com.github.dockerjava.core.command.BuildImageResultCallback;
 import com.github.dockerjava.core.command.PushImageResultCallback;
 import de.worldiety.autocd.util.Environment;
 import java.io.File;
-import java.util.Base64;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;

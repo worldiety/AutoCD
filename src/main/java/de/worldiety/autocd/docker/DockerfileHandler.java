@@ -1,16 +1,20 @@
 package de.worldiety.autocd.docker;
 
 import de.worldiety.autocd.util.FileType;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 public class DockerfileHandler {
     private List<File> fileList = new ArrayList<>();
@@ -21,6 +25,7 @@ public class DockerfileHandler {
 
     /**
      * returns a specified file from the resource folder
+     *
      * @param fileName
      * @return
      */
@@ -45,6 +50,7 @@ public class DockerfileHandler {
     /**
      * Will list all files within a given directory. If there is another directory found, it will step into that
      * directory and will list those files as well.
+     *
      * @param directoryPath
      */
     private void prepFileList(String directoryPath) {
@@ -67,6 +73,7 @@ public class DockerfileHandler {
 
     /**
      * returns the file type based on its extension.
+     *
      * @param listFile
      * @return String
      */
@@ -76,6 +83,7 @@ public class DockerfileHandler {
 
     /**
      * Mps the found file extension to the fitting file type
+     *
      * @param ext
      * @return FileType
      */
@@ -107,6 +115,7 @@ public class DockerfileHandler {
      * This method will create a fitting docker configuration based on the FileType.
      * If the project already has a build.sh file, autoCD will use the given one. If there is none, it will create a default
      * build.sh file.
+     *
      * @return File
      */
     public Optional<File> findDockerConfig() {
