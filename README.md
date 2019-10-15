@@ -42,8 +42,6 @@ containerPort      |   defines which port should be exposed   |  8080   | int |8
 
 ```bash
 {
-  "shouldHost": "false",
-  "registryImagePath": "registry.worldiety.net/flahde/redistest",
   "otherImages": [
     {
       "volumes": [
@@ -75,9 +73,9 @@ containerPort      |   defines which port should be exposed   |  8080   | int |8
     
 * If AutoCD finds any file named '_build.sh_' within your project rood folder, AutoCD will use the build.sh file you
  provide. If there is none, AutoCD will use a default build.sh file. However, after executing the build.sh, AutoCD 
- expects a compiled project with fitting files (e.g. yourProject.jar if it's a Java project).
+ expects a compiled project with fitting files (e.g. yourProject.jar inside of /build/libs if it's a Java project).
  
 * If there is any need for static data (e.g. images, fonts) make sure, that those files are located within the **static** 
-folder (folder must be named **static**) insider your project rood directory. AutoCD will make sure, that the static folder
-will be copied onto the pod.
+folder (folder must be named **static**) inside your project root directory. AutoCD will make sure, that the static folder
+will be copied onto the pod and available at the working directory.
  
