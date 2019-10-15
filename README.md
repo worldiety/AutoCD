@@ -4,37 +4,21 @@
 
 | Parameter     | Function     | Example  | Type | default |
 | ------------- |:-------------| -----:    |-------------:|-------------:|
-|       |     |      |      |       |
-containerPort      |   defines which port should be exposed   |  8080   | int |8080 |
-|       |     |      |      |       |
+|containerPort      |   defines which port should be exposed   |  8080   | int |8080 |
 | servicePort     | defines which port will be exposed to the outside     | 80  | int |80 |
-|       |     |      |      |       |
 | replicas | number of stable sets of replica Pods running at any given time  | 1  | int |1 |
-|       |     |      |      |       |
 | publiclyAccessible |allows to connect from the outside. Note: if **false**, you will not receive a subdomain, ingress     | true/false  | Boolean |true |
-|       |     |      |      |       |
 | terminationGracePeriod |time to shut down the container, if exceeded, container will be terminated forcefully    |60L| long |60L |
-|       |     |      |      |       |
 | dockerImagePath | Path to the Docker Image     |  _path/to/image/_ | String | |
-|       |     |      |      |       |
 | registryImagePath |Path to images from the registry| registry.worldiety.net/flahde/redistest  | String | |
-|       |     |      |      |       |
 | subdomains | maps the environment to a fitting URL | dev -> yourapp.dev.worldiety.de  | String | |
-|       |     |      |      |       |
 | shouldHost | if true, deployment to cluster, not if false| true/false  | boolean |true |
-|       |     |      |      |       |
 | volumes | list of volumes to mount     |   | List<Volume> | |
-|       |     |      |      |       |
 | environmentVariables| define environments variables for a container| |  Map<String, String>| |
-|       |     |      |      |       |
 | otherImages |list of autoCD objects which will be processed recursively  |   | List<AutoCD> | |
-|       |     |      |      |       |
 | args | define arguments that will run in the Pod | "HOSTNAME", "KUBERNETES_PORT"  | List<String> | |
-|       |     |      |      |       |
 | serviceName | name for your service     |   | String |null |
-|       |     |      |      |       |
 | subdomain | subdomain for your webapp     | yourapp.cloudiety.de  | String |null |
-|       |     |      |      |       |
 
 
 
