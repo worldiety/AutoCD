@@ -693,7 +693,8 @@ public class K8sClient {
 
         templateMeta.setLabels(Map.of(
                 "k8s-app", getK8sApp(autoCD),
-                "name", getName()));
+                "name", getName(),
+                "serviceName", getServiceName(autoCD)));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
