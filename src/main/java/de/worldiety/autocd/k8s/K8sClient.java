@@ -648,7 +648,7 @@ public class K8sClient {
         var unclean = getServiceNameLabel(autoCD);
         var clean = unclean.replaceAll("/", "-").replaceAll(":", "");
         if (clean.startsWith("-")) {
-            clean = unclean.substring(1);
+            clean = clean.substring(1);
         }
 
         return clean;
