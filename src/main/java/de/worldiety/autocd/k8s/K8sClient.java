@@ -643,6 +643,18 @@ public class K8sClient {
         return ingress;
     }
 
+    private String getServiceNameLabel(AutoCD autoCD) {
+        if (autoCD.getServiceName() != null) {
+            return autoCD.getServiceName();
+        }
+
+        if (autoCD.getRegistryImagePath() != null) {
+            return autoCD.getRegistryImagePath().replaceAll("registry\\.worldiety\\.net", "");
+        }
+
+        return System.getenv(Environment.CI_PROJECT_NAME.toString());
+    }
+
     @NotNull
     private String getServiceName(@NotNull AutoCD autoCD) {
         if (autoCD.getServiceName() != null) {
@@ -694,7 +706,7 @@ public class K8sClient {
         templateMeta.setLabels(Map.of(
                 "k8s-app", getK8sApp(autoCD),
                 "name", getName(),
-                "serviceName", getServiceName(autoCD)));
+                "serviceName", getServiceNameLabel(autoCD)));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
