@@ -643,6 +643,17 @@ public class K8sClient {
         return ingress;
     }
 
+
+    private String getCleanServiceNameLabel(AutoCD autoCD) {
+        var unclean = getServiceNameLabel(autoCD);
+        var clean = unclean.replaceAll("/", "-").replaceAll(":", "");
+        if (clean.startsWith("-")) {
+            clean = unclean.substring(1);
+        }
+
+        return clean;
+    }
+
     private String getServiceNameLabel(AutoCD autoCD) {
         if (autoCD.getServiceName() != null) {
             return autoCD.getServiceName();
@@ -706,7 +717,7 @@ public class K8sClient {
         templateMeta.setLabels(Map.of(
                 "k8s-app", getK8sApp(autoCD),
                 "name", getName(),
-                "serviceName", getServiceNameLabel(autoCD).replaceAll("/", "-").replaceAll(":", "")));
+                "serviceName", getCleanServiceNameLabel(autoCD)));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
