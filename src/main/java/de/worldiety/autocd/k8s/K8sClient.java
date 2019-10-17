@@ -149,7 +149,7 @@ public class K8sClient {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
         meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName).substring(0, 20));
-        var labels = Map.of("k8s-app", getK8sApp(autoCD));
+        var labels = Map.of("k8s-app", getK8sApp(autoCD), "serviceName", getCleanServiceNameLabel(autoCD));
         meta.setLabels(labels);
 
         var spec = new V1StatefulSetSpec();
