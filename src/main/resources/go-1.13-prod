@@ -1,4 +1,4 @@
-FROM golang:1.13.1-alpine as
+FROM golang:1.13.1-alpine
 
 COPY --from=builder /app/app app
 COPY --from=builder /app/static/ static/
