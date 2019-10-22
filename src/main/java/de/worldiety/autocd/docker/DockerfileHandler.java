@@ -23,6 +23,12 @@ public class DockerfileHandler {
         prepFileList(path);
     }
 
+    /**
+     * returns a specified file from the resource folder
+     *
+     * @param fileName
+     * @return
+     */
     @NotNull
     @Contract("_ -> new")
     private InputStream getFileFromResources(String fileName) {
@@ -41,6 +47,12 @@ public class DockerfileHandler {
         this.fileList = fileList;
     }
 
+    /**
+     * Will list all files within a given directory. If there is another directory found, it will step into that
+     * directory and will list those files as well.
+     *
+     * @param directoryPath
+     */
     private void prepFileList(String directoryPath) {
         var directory = new File(directoryPath);
 
@@ -59,10 +71,22 @@ public class DockerfileHandler {
         }
     }
 
+    /**
+     * returns the file type based on its extension.
+     *
+     * @param listFile
+     * @return String
+     */
     private String getFileExt(@NotNull File listFile) {
         return FilenameUtils.getExtension(listFile.getAbsolutePath());
     }
 
+    /**
+     * Mps the found file extension to the fitting file type
+     *
+     * @param ext
+     * @return FileType
+     */
     @Contract(pure = true)
     private FileType mapFileTypeToFileType(@NotNull String ext) {
         switch (ext) {
@@ -87,6 +111,13 @@ public class DockerfileHandler {
                 .findFirst().orElse(FileType.OTHER);
     }
 
+    /**
+     * This method will create a fitting docker configuration based on the FileType.
+     * If the project already has a build.sh file, autoCD will use the given one. If there is none, it will create a default
+     * build.sh file.
+     *
+     * @return File
+     */
     public Optional<File> findDockerConfig() {
         var opt = fileList.stream()
                 .map(this::getFileExt)

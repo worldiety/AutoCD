@@ -135,12 +135,12 @@ public class AutoCD {
         return registryImagePath;
     }
 
-    public String getIdentifierRegistryImagePath() {
-        return registryImagePath.split(":")[0];
-    }
-
     public void setRegistryImagePath(String registryImagePath) {
         this.registryImagePath = registryImagePath;
+    }
+
+    public String getIdentifierRegistryImagePath() {
+        return registryImagePath.split(":")[0];
     }
 
     public int getContainerPort() {
