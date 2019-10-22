@@ -149,7 +149,7 @@ public class K8sClient {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
         meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName).substring(0, 20));
-        var labels = Map.of("k8s-app", getK8sApp(autoCD));
+        var labels = Map.of("k8s-app", getK8sApp(autoCD), "serviceName", getCleanServiceNameLabel(autoCD));
         meta.setLabels(labels);
 
         var spec = new V1StatefulSetSpec();
@@ -165,7 +165,8 @@ public class K8sClient {
 
         templateMeta.setLabels(Map.of(
                 "k8s-app", getK8sApp(autoCD),
-                "name", getName()));
+                "name", getName(),
+                "serviceName", getCleanServiceNameLabel(autoCD)));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
@@ -643,6 +644,29 @@ public class K8sClient {
         return ingress;
     }
 
+
+    private String getCleanServiceNameLabel(AutoCD autoCD) {
+        var unclean = getServiceNameLabel(autoCD);
+        var clean = unclean.replaceAll("/", "-").replaceAll(":", "");
+        if (clean.startsWith("-")) {
+            clean = clean.substring(1);
+        }
+
+        return clean;
+    }
+
+    private String getServiceNameLabel(AutoCD autoCD) {
+        if (autoCD.getServiceName() != null) {
+            return autoCD.getServiceName();
+        }
+
+        if (autoCD.getRegistryImagePath() != null) {
+            return autoCD.getRegistryImagePath().replaceAll("registry\\.worldiety\\.net", "");
+        }
+
+        return System.getenv(Environment.CI_PROJECT_NAME.toString());
+    }
+
     @NotNull
     private String getServiceName(@NotNull AutoCD autoCD) {
         if (autoCD.getServiceName() != null) {
@@ -693,7 +717,8 @@ public class K8sClient {
 
         templateMeta.setLabels(Map.of(
                 "k8s-app", getK8sApp(autoCD),
-                "name", getName()));
+                "name", getName(),
+                "serviceName", getCleanServiceNameLabel(autoCD)));
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();

@@ -104,10 +104,8 @@ public class Main {
         */
 
         if (!autoCD.isShouldHost()) {
-            if (oldAutoCD != null && oldAutoCD.isShouldHost()) {
-                log.info("Service is being removed from k8s.");
-                removeWithDependencies(autoCD, k8sClient);
-            }
+            log.info("Service is being removed from k8s.");
+            removeWithDependencies(autoCD, k8sClient);
 
             log.info("Not deploying to k8s because autocd is set to no hosting");
             return;
