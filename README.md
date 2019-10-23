@@ -1,6 +1,161 @@
-# Dokumentation für AutoCD
+# Documentation AutoCD
 
-### Paramenter für AutoCD
+## Usage
+What is AutoCD and what can it do for me? 
+Docker and Kubernetes are everywhere, everybody wants to use it but it is
+not always simple to write a fitting docker file that satisfies all constrains.
+Even though it would be possible do generate an image by coping and pasting 
+all the bits you might need, the chance of an error are not insignificant.
+To prevent errors like that and to make docker/kubernetes more accessible 
+we created AutoCD.
+
+AutoCD helps you to get your project ready for your k8s cluster. 
+The program will automatically generate a fitting docker image and deploy
+that to your cluster. Therefor AutoCD detects the project language 
+(Java 8+, Go, Vue.js, Node.js are supported) and uses the matching, 
+predefined docker image (if there is none found within your root folder),
+to deploy the project to your cluster. It can also take down old, not used
+projects from the cluster.
+All you have to do to use AutoCD is, to include it into your gitlab-ci.yml
+file and, if you have one, include a JSON file for configure AutoCD. 
+The JSON file allows you to make specific changes to the configuration 
+(e.g. port, volumes).
+
+## Installation
+If you want to integrate AutoCD to your project, you need to adjust the 
+gitlab-ci.yml.
+Add the following to the _.script_ option.
+```bash
+  script:
+    - curl https://autocd.cloudiety.de/ -o app.jar
+    - java -jar app.jar ${KUBE_URL} ${KUBE_TOKEN} ${KUBE_CA_PEM_FILE} ${BUILDTYPE}
+```
+This will download and execute the AutoCD tool. All other variables
+will be obtained from your global GitLab configuration.
+The final configuration should look like this:
+```bash
+image: fredlahde/dind-java
+services:
+  - docker:dind
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+
+stages:
+  - deploy-prod
+  - deploy-dev
+
+.deploy:
+  stage: deploy
+  before_script:
+    - apk add curl
+    - apk add git
+    - git --no-pager show $(git log --pretty=format:'%h' -n 2 | tail -n 1):autocd.json 2>/dev/null 1>oldautocd.json || true
+  environment: default #Needed for CI to autopopulate KUBE_ fields
+  tags:
+    - docker-build-runner
+  script:
+    - curl https://autocd.cloudiety.de/ -o app.jar
+    - java -jar app.jar ${KUBE_URL} ${KUBE_TOKEN} ${KUBE_CA_PEM_FILE} ${BUILDTYPE}
+
+deploy-prod:
+  extends: .deploy
+  stage: deploy-prod
+  variables:
+    BUILDTYPE: prod
+  only:
+    - master
+
+```
+#### JSON configuration file example
+In case you want change certain values, set them in a JSON file. See the
+table below for parameters to specify. As an example, here is a JSON file 
+```bash
+{
+    "otherImages": [
+      {
+        "registryImagePath": "redis:latest",
+        "containerPort": 6379,
+        "servicePort": 6379,
+        "publiclyAccessible": "false",
+        "serviceName": "redis"
+      },
+      {
+        "registryImagePath": "path/to/registry/service/image",
+        "serviceName": "content-service",
+        "subdomains": {
+          "dev": "yourapp.dev.com",
+          "edit": "yourapp.edit.com",
+          "stage": "yourapp.com"
+        },
+        "environmentVariables": {
+          "dev": {
+            "SPRING_PROFILES_ACTIVE": "dev",
+            "REDIS_URL": "redis",
+            "SYNC_URL": "http://sync-service"
+          },
+          "edit": {
+            "SPRING_PROFILES_ACTIVE": "stage",
+            "REDIS_URL": "redis",
+            "SYNC_URL": "http://sync-service",
+          },
+          "stage": {
+            "SPRING_PROFILES_ACTIVE": "prod",
+            "REDIS_URL": "redis",
+          }
+        }
+      },
+      {
+        "registryImagePath": "path/to/registry/service/image",
+        "serviceName": "sync-service",
+        "subdomains": {
+          "dev": "yourapp.dev.com",
+          "edit": "yourapp.edit.com",
+          "stage": "yourapp.com"
+        },
+        "environmentVariables": {
+          "dev": {
+            "SPRING_PROFILES_ACTIVE": "dev",
+            "REDIS_URL": "redis"
+          },
+          "edit": {
+            "SPRING_PROFILES_ACTIVE": "stage",
+            "REDIS_URL": "redis"
+          },
+          "stage": {
+            "SPRING_PROFILES_ACTIVE": "prod",
+            "REDIS_URL": "redis"
+          }
+        }
+      }
+    ],
+    "containerPort": 3000,
+    "environmentVariables": {
+      "dev": {
+        "ENVIRONMENT": "dev",
+        "CONTENT_SERVICE_URL": "https://content-dev.de",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de",
+        "EDITOR_URL": "https://cms-editor.de/js/app.js"
+      },
+      "edit": {
+        "ENVIRONMENT": "edit",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de"
+      },
+      "stage": {
+        "ENVIRONMENT": "stage",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de",
+      }
+    },
+    "serviceName" : "website",
+    "subdomains": {
+      "dev": "yourapp.dev.com",
+      "edit": "yourapp.edit.com",
+      "stage": "yourapp.com"
+    }
+  }
+```
+
+### Paramenter for AutoCD
 
 | Parameter     | Function     | Example  | Type | default |
 | ------------- |:-------------| -----:    |-------------:|-------------:|
@@ -48,10 +203,16 @@
 }
 ```
 
+## Environment
+To run the autoCD.jar, Java 12 is necessary.
+Variables, for example KUBE_URL, KUBE_TOKEN, KUBE_CA_PEM_FILE, BUILDTYPE
+should be set in your GitLab deployment variables.
+
+
 ## Important Notes
 * The parameter class 'volume' has parameters of its own:
     * _volumeMount_: name of the Volume 
-    * _volumeSize_: size in gigabyte
+    * _volumeSize_: size string from k8s (e.g. 1Gi, 100Mi)
     * _folderPermission_: permissions within the folder
     * _retainVolume_: boolean value with determines if the volume should be retained after a restart 
     
