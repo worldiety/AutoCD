@@ -207,7 +207,11 @@ table below for parameters to specify. As an example, here is a JSON file
 ## Environment
 To run the autoCD.jar, Java 12 is necessary.
 Variables, for example KUBE_URL, KUBE_TOKEN, KUBE_CA_PEM_FILE, BUILDTYPE
-should be set in your GitLab deployment variables.
+should be set in your GitLab deployment variables. You do not need to worry about these, since they are created by 
+GitLab when establishing a cluster or linking your GitLab instance to an already existing cluster. Therefore they have 
+nothing to do with the AutoCD tool directly. If you want to learn more about kubernetes and Gitlab, please refer to the
+official [GitLab documentation](https://docs.gitlab.com/ee/user/project/clusters/#deployment-variables).
+
 
 
 ## Important Notes
