@@ -1,4 +1,4 @@
-# Dokumentation für AutoCD
+# Documentation AutoCD
 
 ## Usage
 What is AutoCD and what can it do for me? 
@@ -199,7 +199,7 @@ To run the autoCD.jar, Java 12 is necessary
 ## Important Notes
 * The parameter class 'volume' has parameters of its own:
     * _volumeMount_: name of the Volume 
-    * _volumeSize_: size in gigabyte
+    * _volumeSize_: size string from k8s (e.g. 1Gi, 100Mi)
     * _folderPermission_: permissions within the folder
     * _retainVolume_: boolean value with determines if the volume should be retained after a restart 
     
