@@ -3,6 +3,7 @@ image: openjdk:12-alpine
 stages:
   - deploy-prod
   - deploy-dev
+  - lint
 
 .deploy:
   stage: deploy
@@ -32,3 +33,11 @@ deploy-dev:
     AUTOCD_TOKEN: ${DEV_TOKEN}
   only:
     - develop
+
+checkstyle:
+  stage: lint
+  allow_failure: false
+  script:
+    - ./gradlew checkstyleMain
+
+
