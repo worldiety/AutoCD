@@ -21,9 +21,25 @@ file and, if you have one, include a JSON file for configure AutoCD.
 The JSON file allows you to make specific changes to the configuration 
 (e.g. port, volumes).
 
-#### gitlab-ci.yml
+## Installation
+If you want to integrate AutoCD to your project, you need to adjust the 
+gitlab-ci.yml.
+Add the following to the _.script_ option.
 ```bash
-image: openjdk:12-alpine
+  script:
+    - curl https://autocd.cloudiety.de/ -o app.jar
+    - java -jar app.jar ${KUBE_URL} ${KUBE_TOKEN} ${KUBE_CA_PEM_FILE} ${BUILDTYPE}
+```
+This will download and execute the AutoCD tool. All other variables
+will be obtained from your global GitLab configuration.
+The final configuration should look like this:
+```bash
+image: fredlahde/dind-java
+services:
+  - docker:dind
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
 
 stages:
   - deploy-prod
@@ -33,32 +49,27 @@ stages:
   stage: deploy
   before_script:
     - apk add curl
-  script:
-    - ./gradlew clean jar
-    - echo ${AUTOCD_URL}
-    - curl -vsSfLX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
+    - apk add git
+    - git --no-pager show $(git log --pretty=format:'%h' -n 2 | tail -n 1):autocd.json 2>/dev/null 1>oldautocd.json || true
+  environment: default #Needed for CI to autopopulate KUBE_ fields
   tags:
     - docker-build-runner
+  script:
+    - curl https://autocd.cloudiety.de/ -o app.jar
+    - java -jar app.jar ${KUBE_URL} ${KUBE_TOKEN} ${KUBE_CA_PEM_FILE} ${BUILDTYPE}
 
 deploy-prod:
-  stage: deploy-prod
   extends: .deploy
+  stage: deploy-prod
   variables:
-    AUTOCD_URL: autocd.cloudiety.de
-    AUTOCD_TOKEN: ${PROD_TOKEN}
+    BUILDTYPE: prod
   only:
     - master
 
-deploy-dev:
-  stage: deploy-dev
-  extends: .deploy
-  variables:
-    AUTOCD_URL: autocd-dev.cloudiety.de
-    AUTOCD_TOKEN: ${DEV_TOKEN}
-  only:
-    - develop
 ```
 #### JSON configuration file example
+In case you want change certain values, set them in a JSON file. See the
+table below for parameters to specify. As an example, here is a JSON file 
 ```bash
 {
     "otherImages": [
@@ -146,7 +157,7 @@ deploy-dev:
 
   
 
-### Paramenter für AutoCD
+### Paramenter for AutoCD
 
 | Parameter     | Function     | Example  | Type | default |
 | ------------- |:-------------| -----:    |-------------:|-------------:|
@@ -194,7 +205,10 @@ deploy-dev:
 }
 ```
 ## Environment
-To run the autoCD.jar, Java 12 is necessary 
+To run the autoCD.jar, Java 12 is necessary.
+Variables, for example KUBE_URL, KUBE_TOKEN, KUBE_CA_PEM_FILE, BUILDTYPE
+should be set in your GitLab deployment variables.
+
 
 ## Important Notes
 * The parameter class 'volume' has parameters of its own:
