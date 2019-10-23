@@ -1,0 +1,82 @@
+{
+  "otherImages": [
+    {
+      "registryImagePath": "redis:latest",
+      "containerPort": 6379,
+      "servicePort": 6379,
+      "publiclyAccessible": "false",
+      "serviceName": "redis"
+    },
+    {
+      "registryImagePath": "path/to/registry/service/image",
+      "serviceName": "content-service",
+      "subdomains": {
+        "dev": "yourapp.dev.com",
+        "edit": "yourapp.edit.com",
+        "stage": "yourapp.com"
+      },
+      "environmentVariables": {
+        "dev": {
+          "SPRING_PROFILES_ACTIVE": "dev",
+          "REDIS_URL": "redis",
+          "SYNC_URL": "http://sync-service"
+        },
+        "edit": {
+          "SPRING_PROFILES_ACTIVE": "stage",
+          "REDIS_URL": "redis",
+          "SYNC_URL": "http://sync-service"
+        },
+        "stage": {
+          "SPRING_PROFILES_ACTIVE": "prod",
+          "REDIS_URL": "redis"
+        }
+      }
+    },
+    {
+      "registryImagePath": "path/to/registry/service/image",
+      "serviceName": "sync-service",
+      "subdomains": {
+        "dev": "yourapp.dev.com",
+        "edit": "yourapp.edit.com",
+        "stage": "yourapp.com"
+      },
+      "environmentVariables": {
+        "dev": {
+          "SPRING_PROFILES_ACTIVE": "dev",
+          "REDIS_URL": "redis"
+        },
+        "edit": {
+          "SPRING_PROFILES_ACTIVE": "stage",
+          "REDIS_URL": "redis"
+        },
+        "stage": {
+          "SPRING_PROFILES_ACTIVE": "prod",
+          "REDIS_URL": "redis"
+        }
+      }
+    }
+  ],
+  "containerPort": 3000,
+  "environmentVariables": {
+    "dev": {
+      "ENVIRONMENT": "dev",
+      "CONTENT_SERVICE_URL": "https://content-dev.de",
+      "NEWSLETTER_SERVICE_URL": "https://newsletter.de",
+      "EDITOR_URL": "https://cms-editor.de/js/app.js"
+    },
+    "edit": {
+      "ENVIRONMENT": "edit",
+      "NEWSLETTER_SERVICE_URL": "https://newsletter.de"
+    },
+    "stage": {
+      "ENVIRONMENT": "stage",
+      "NEWSLETTER_SERVICE_URL": "https://newsletter.de"
+    }
+  },
+  "serviceName" : "website",
+  "subdomains": {
+    "dev": "yourapp.dev.com",
+    "edit": "yourapp.edit.com",
+    "stage": "yourapp.com"
+  }
+}

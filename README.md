@@ -1,5 +1,151 @@
 # Dokumentation für AutoCD
 
+## Usage
+What is AutoCD and what can it do for me? 
+Docker and Kubernetes are everywhere, everybody wants to use it but it is
+not always simple to write a fitting docker file that satisfies all constrains.
+Even though it would be possible do generate an image by coping and pasting 
+all the bits you might need, the chance of an error are not insignificant.
+To prevent errors like that and to make docker/kubernetes more accessible 
+we created AutoCD.
+
+AutoCD helps you to get your project ready for your k8s cluster. 
+The program will automatically generate a fitting docker image and deploy
+that to your cluster. Therefor AutoCD detects the project language 
+(Java 8+, Go, Vue.js, Node.js are supported) and uses the matching, 
+predefined docker image (if there is none found within your root folder),
+to deploy the project to your cluster. It can also take down old, not used
+projects from the cluster.
+All you have to do to use AutoCD is, to include it into your gitlab-ci.yml
+file and, if you have one, include a JSON file for configure AutoCD. 
+The JSON file allows you to make specific changes to the configuration 
+(e.g. port, volumes).
+
+#### gitlab-ci.yml
+```bash
+image: openjdk:12-alpine
+
+stages:
+  - deploy-prod
+  - deploy-dev
+
+.deploy:
+  stage: deploy
+  before_script:
+    - apk add curl
+  script:
+    - ./gradlew clean jar
+    - echo ${AUTOCD_URL}
+    - curl -vsSfLX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
+  tags:
+    - docker-build-runner
+
+deploy-prod:
+  stage: deploy-prod
+  extends: .deploy
+  variables:
+    AUTOCD_URL: autocd.cloudiety.de
+    AUTOCD_TOKEN: ${PROD_TOKEN}
+  only:
+    - master
+
+deploy-dev:
+  stage: deploy-dev
+  extends: .deploy
+  variables:
+    AUTOCD_URL: autocd-dev.cloudiety.de
+    AUTOCD_TOKEN: ${DEV_TOKEN}
+  only:
+    - develop
+```
+#### JSON configuration file example
+```bash
+{
+    "otherImages": [
+      {
+        "registryImagePath": "redis:latest",
+        "containerPort": 6379,
+        "servicePort": 6379,
+        "publiclyAccessible": "false",
+        "serviceName": "redis"
+      },
+      {
+        "registryImagePath": "path/to/registry/service/image",
+        "serviceName": "content-service",
+        "subdomains": {
+          "dev": "yourapp.dev.com",
+          "edit": "yourapp.edit.com",
+          "stage": "yourapp.com"
+        },
+        "environmentVariables": {
+          "dev": {
+            "SPRING_PROFILES_ACTIVE": "dev",
+            "REDIS_URL": "redis",
+            "SYNC_URL": "http://sync-service"
+          },
+          "edit": {
+            "SPRING_PROFILES_ACTIVE": "stage",
+            "REDIS_URL": "redis",
+            "SYNC_URL": "http://sync-service",
+          },
+          "stage": {
+            "SPRING_PROFILES_ACTIVE": "prod",
+            "REDIS_URL": "redis",
+          }
+        }
+      },
+      {
+        "registryImagePath": "path/to/registry/service/image",
+        "serviceName": "sync-service",
+        "subdomains": {
+          "dev": "yourapp.dev.com",
+          "edit": "yourapp.edit.com",
+          "stage": "yourapp.com"
+        },
+        "environmentVariables": {
+          "dev": {
+            "SPRING_PROFILES_ACTIVE": "dev",
+            "REDIS_URL": "redis"
+          },
+          "edit": {
+            "SPRING_PROFILES_ACTIVE": "stage",
+            "REDIS_URL": "redis"
+          },
+          "stage": {
+            "SPRING_PROFILES_ACTIVE": "prod",
+            "REDIS_URL": "redis"
+          }
+        }
+      }
+    ],
+    "containerPort": 3000,
+    "environmentVariables": {
+      "dev": {
+        "ENVIRONMENT": "dev",
+        "CONTENT_SERVICE_URL": "https://content-dev.de",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de",
+        "EDITOR_URL": "https://cms-editor.de/js/app.js"
+      },
+      "edit": {
+        "ENVIRONMENT": "edit",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de"
+      },
+      "stage": {
+        "ENVIRONMENT": "stage",
+        "NEWSLETTER_SERVICE_URL": "https://newsletter.de",
+      }
+    },
+    "serviceName" : "website",
+    "subdomains": {
+      "dev": "yourapp.dev.com",
+      "edit": "yourapp.edit.com",
+      "stage": "yourapp.com"
+    }
+  }
+```
+
+  
+
 ### Paramenter für AutoCD
 
 | Parameter     | Function     | Example  | Type | default |
@@ -47,6 +193,8 @@
   ]
 }
 ```
+## Environment
+To run the autoCD.jar, Java 12 is necessary 
 
 ## Important Notes
 * The parameter class 'volume' has parameters of its own:
