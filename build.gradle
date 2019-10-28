@@ -30,18 +30,9 @@ tasks.withType(Checkstyle) {
 
         classpath = files()
     }
-    checkstyleTest {
 
-        source 'src/test/java'
-        include '**/*.java'
-
-        ignoreFailures = false
-
-        classpath = files()
-    }
 }
 compileJava.dependsOn(checkstyleMain)
-compileJava.dependsOn(checkstyleTest)
 
 sourceSets {
     main {
