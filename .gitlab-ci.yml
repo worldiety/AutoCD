@@ -39,5 +39,3 @@ checkstyle:
   allow_failure: false
   script:
     - ./gradlew checkstyleMain
-
-

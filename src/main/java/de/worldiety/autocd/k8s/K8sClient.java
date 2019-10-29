@@ -26,6 +26,7 @@ import io.kubernetes.client.models.ExtensionsV1beta1Ingress;
 import io.kubernetes.client.models.ExtensionsV1beta1IngressBackendBuilder;
 import io.kubernetes.client.models.ExtensionsV1beta1IngressRuleBuilder;
 import io.kubernetes.client.models.ExtensionsV1beta1IngressSpecBuilder;
+import io.kubernetes.client.models.ExtensionsV1beta1IngressTLSBuilder;
 import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
 import io.kubernetes.client.models.V1ContainerPort;
@@ -605,6 +606,9 @@ public class K8sClient {
         ingress.setKind("Ingress");
         var meta = getNamespacedMeta();
         meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
+        meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
+                "kubernetes.io/ingress.class", "nginx"));
+
 
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
@@ -635,6 +639,10 @@ public class K8sClient {
                                                 .build())
                                         .build())
                                 .build())
+                        .build())
+                .withTls(new ExtensionsV1beta1IngressTLSBuilder()
+                        .withHosts(autoCD.getSubdomain())
+                        .withSecretName(Util.hash(autoCD.getSubdomain()).substring(0, 10))
                         .build())
                 .build();
 
