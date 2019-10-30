@@ -105,7 +105,7 @@ public class K8sClient {
 
     private void deployStateful(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
-        deleteIngress(ingress);
+        ingress.forEach(this::deleteIngress);
         var service = getService(autoCD);
         deleteService(service);
         var set = getStatefulSet(autoCD);
@@ -116,7 +116,7 @@ public class K8sClient {
         addSecret();
         createStatefulSet(set);
         createService(service);
-        createIngress(ingress);
+        ingress.forEach(this::createIngress);
     }
 
     private void createStatefulSet(V1StatefulSet set) {
@@ -256,7 +256,7 @@ public class K8sClient {
     @SuppressWarnings("DuplicatedCode")
     private void deploy(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
-        deleteIngress(ingress);
+        ingress.forEach(this::deleteIngress);
         var service = getService(autoCD);
         deleteService(service);
         var claims = getPersistentVolumeClaims(autoCD);
@@ -278,7 +278,7 @@ public class K8sClient {
         reclaimPVS(pvs);
 
         if (autoCD.isPubliclyAccessible()) {
-            createIngress(ingress);
+            ingress.forEach(this::createIngress);
         }
     }
 
@@ -600,25 +600,16 @@ public class K8sClient {
         }).collect(Collectors.toList());
     }
 
-    @NotNull
-    private ExtensionsV1beta1Ingress getIngress(@NotNull AutoCD autoCD) {
-        var ingress = new ExtensionsV1beta1Ingress();
-        ingress.setKind("Ingress");
-        var meta = getNamespacedMeta();
-        meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
-        meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
-                "kubernetes.io/ingress.class", "nginx"));
-
-
+    private List<ExtensionsV1beta1Ingress> getIngress(@NotNull AutoCD autoCD) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
             var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null);
             var ingressWithHostAlreadyPresent = ingresses.getItems()
                     .stream()
-                    .filter(it -> !it.getMetadata().getNamespace().equals(meta.getNamespace()))
+                    .filter(it -> !it.getMetadata().getNamespace().equals(getNamespaceString()))
                     .anyMatch(it ->
                             it.getSpec().getRules().stream()
-                                    .anyMatch(rule -> rule.getHost().equals(autoCD.getSubdomains())));
+                                    .anyMatch(rule -> autoCD.getSubdomains().contains(rule.getHost())));
 
             if (ingressWithHostAlreadyPresent) {
                 throw new IllegalStateException("There is already an ingress with host: " + autoCD.getSubdomains() + " present");
@@ -628,30 +619,46 @@ public class K8sClient {
             log.error("Could not get Ingresses for all namespaces", e);
         }
 
-        final ExtensionsV1beta1IngressRuleBuilder[] rules = {new ExtensionsV1beta1IngressRuleBuilder()};
+        List<ExtensionsV1beta1Ingress> returnList = new ArrayList<>();
 
-        autoCD.getSubdomains().forEach(subdomain -> rules[0] = rules[0].withNewHost(subdomain)
-                .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
-                        .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
-                                .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
-                                        .withServiceName(getServiceName(autoCD))
-                                        .withServicePort(new IntOrString(autoCD.getServicePort()))
-                                        .build())
-                                .build())
-                        .build()));
+        for (String subdomain : autoCD.getSubdomains()) {
 
-        var spec = new ExtensionsV1beta1IngressSpecBuilder()
-                .withRules(rules[0].build())
-                .withTls(new ExtensionsV1beta1IngressTLSBuilder()
-                        .withHosts(autoCD.getSubdomains())
-                        .withSecretName(Util.hash(autoCD.getSubdomains().get(0)).substring(0, 10))
-                        .build())
-                .build();
+            var ingress = new ExtensionsV1beta1Ingress();
+            ingress.setKind("Ingress");
+            var meta = getNamespacedMeta();
+            meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
+            meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
+                    "kubernetes.io/ingress.class", "nginx"));
 
-        ingress.setSpec(spec);
-        ingress.setMetadata(meta);
+            var rules = new ExtensionsV1beta1IngressRuleBuilder();
 
-        return ingress;
+            rules.withHost(subdomain)
+                    .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
+                            .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
+                                    .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
+                                            .withServiceName(getServiceName(autoCD))
+                                            .withServicePort(new IntOrString(autoCD.getServicePort()))
+                                            .build())
+                                    .build())
+                            .build());
+
+            var spec = new ExtensionsV1beta1IngressSpecBuilder()
+                    .withRules(rules.build())
+                    .withTls(new ExtensionsV1beta1IngressTLSBuilder()
+                            .withHosts(subdomain)
+                            .withSecretName(Util.hash(subdomain).substring(0, 10))
+                            .build())
+                    .build();
+
+
+            ingress.setSpec(spec);
+            ingress.setMetadata(meta);
+
+            returnList.add(ingress);
+        }
+
+
+        return returnList;
     }
 
 
@@ -902,7 +909,7 @@ public class K8sClient {
     @SuppressWarnings("DuplicatedCode")
     public void removeDeploymentFromK8s(AutoCD autoCD) {
         var ingress = getIngress(autoCD);
-        deleteIngress(ingress);
+        ingress.forEach(this::deleteIngress);
         var service = getService(autoCD);
         deleteService(service);
         var deployment = getDeployment(autoCD);
