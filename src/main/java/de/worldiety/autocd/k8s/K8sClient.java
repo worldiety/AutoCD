@@ -618,31 +618,33 @@ public class K8sClient {
                     .filter(it -> !it.getMetadata().getNamespace().equals(meta.getNamespace()))
                     .anyMatch(it ->
                             it.getSpec().getRules().stream()
-                                    .anyMatch(rule -> rule.getHost().equals(autoCD.getSubdomain())));
+                                    .anyMatch(rule -> rule.getHost().equals(autoCD.getSubdomains())));
 
             if (ingressWithHostAlreadyPresent) {
-                throw new IllegalStateException("There is already an ingress with host: " + autoCD.getSubdomain() + " present");
+                throw new IllegalStateException("There is already an ingress with host: " + autoCD.getSubdomains() + " present");
             }
 
         } catch (ApiException e) {
             log.error("Could not get Ingresses for all namespaces", e);
         }
 
-        var spec = new ExtensionsV1beta1IngressSpecBuilder()
-                .withRules(new ExtensionsV1beta1IngressRuleBuilder()
-                        .withHost(autoCD.getSubdomain())
-                        .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
-                                .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
-                                        .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
-                                                .withServiceName(getServiceName(autoCD))
-                                                .withServicePort(new IntOrString(autoCD.getServicePort()))
-                                                .build())
+        final ExtensionsV1beta1IngressRuleBuilder[] rules = {new ExtensionsV1beta1IngressRuleBuilder()};
+
+        autoCD.getSubdomains().forEach(subdomain -> rules[0] = rules[0].withHost(subdomain)
+                .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
+                        .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
+                                .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
+                                        .withServiceName(getServiceName(autoCD))
+                                        .withServicePort(new IntOrString(autoCD.getServicePort()))
                                         .build())
                                 .build())
-                        .build())
+                        .build()));
+
+        var spec = new ExtensionsV1beta1IngressSpecBuilder()
+                .withRules(rules[0].build())
                 .withTls(new ExtensionsV1beta1IngressTLSBuilder()
-                        .withHosts(autoCD.getSubdomain())
-                        .withSecretName(Util.hash(autoCD.getSubdomain()).substring(0, 10))
+                        .withHosts(autoCD.getSubdomains())
+                        .withSecretName(Util.hash(autoCD.getSubdomains().get(0)).substring(0, 10))
                         .build())
                 .build();
 

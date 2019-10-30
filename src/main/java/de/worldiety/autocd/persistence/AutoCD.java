@@ -13,16 +13,20 @@ public class AutoCD {
     private long terminationGracePeriod = 60L;
     private String dockerImagePath;
     private String registryImagePath;
-    private Map<String, String> subdomains = new HashMap<>();
+    private Map<String, List<String>> subdomainsEnv = new HashMap<>();
     private boolean shouldHost = true;
     private List<Volume> volumes = new ArrayList<>();
     private Map<String, Map<String, String>> environmentVariables = new HashMap<>();
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
-    private String subdomain;
+    private List<String> subdomains;
 
-    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, Map<String, String> subdomains, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName, String subdomain) {
+
+    public AutoCD() {
+    }
+
+    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, Map<String, List<String>> subdomainsEnv, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName, List<String> subdomains) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.replicas = replicas;
@@ -30,25 +34,14 @@ public class AutoCD {
         this.terminationGracePeriod = terminationGracePeriod;
         this.dockerImagePath = dockerImagePath;
         this.registryImagePath = registryImagePath;
-        this.subdomains = subdomains;
+        this.subdomainsEnv = subdomainsEnv;
         this.shouldHost = shouldHost;
         this.volumes = volumes;
         this.environmentVariables = environmentVariables;
         this.otherImages = otherImages;
         this.args = args;
         this.serviceName = serviceName;
-        this.subdomain = subdomain;
-    }
-
-    public AutoCD() {
-    }
-
-    public String getSubdomain() {
-        return subdomain;
-    }
-
-    public void setSubdomain(String subdomain) {
-        this.subdomain = subdomain;
+        this.subdomains = subdomains;
     }
 
     public int getReplicas() {
@@ -91,11 +84,19 @@ public class AutoCD {
         this.terminationGracePeriod = terminationGracePeriod;
     }
 
-    public Map<String, String> getSubdomains() {
+    public Map<String, List<String>> getSubdomainsEnv() {
+        return subdomainsEnv;
+    }
+
+    public void setSubdomainsEnv(Map<String, List<String>> subdomainsEnv) {
+        this.subdomainsEnv = subdomainsEnv;
+    }
+
+    public List<String> getSubdomains() {
         return subdomains;
     }
 
-    public void setSubdomains(Map<String, String> subdomains) {
+    public void setSubdomains(List<String> subdomains) {
         this.subdomains = subdomains;
     }
 

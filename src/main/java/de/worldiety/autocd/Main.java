@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -96,7 +97,7 @@ public class Main {
         }
 
         populateRegistryImagePath(autoCD, buildType, finder);
-        populateSubdomain(autoCD, buildType, autoCD.getSubdomains());
+        populateSubdomain(autoCD, buildType, autoCD.getSubdomainsEnv());
         populateContainerPort(autoCD, finder);
 
         /* Checks if the app should be hosted on the cluster, if one decides to abandon the app, this method will
@@ -112,7 +113,7 @@ public class Main {
         }
 
         deployWithDependencies(autoCD, k8sClient, buildType);
-        log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomain());
+        log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomains());
     }
 
     /**
@@ -175,18 +176,17 @@ public class Main {
      * matching build type.
      * If autoCD does not have any subdomains, this method will build one out of the build type and an hashed version
      * of the registry image path.
-     *
-     * @param autoCD
+     *  @param autoCD
      * @param buildType
      * @param subdomains
      */
-    private static void populateSubdomain(AutoCD autoCD, String buildType, Map<String, String> subdomains) {
-        if (autoCD.getSubdomains() != null && subdomains.keySet().size() != 0) {
-            autoCD.setSubdomain(autoCD.getSubdomains().get(buildType));
+    private static void populateSubdomain(AutoCD autoCD, String buildType, Map<String, List<String>> subdomains) {
+        if (autoCD.getSubdomainsEnv() != null && subdomains.keySet().size() != 0) {
+            autoCD.setSubdomains(autoCD.getSubdomainsEnv().get(buildType));
         }
 
-        if (autoCD.getSubdomain() == null || autoCD.getSubdomain().isEmpty()) {
-            autoCD.setSubdomain(Util.buildSubdomain(buildType, Util.hash(autoCD.getIdentifierRegistryImagePath()).substring(0, 5)));
+        if (autoCD.getSubdomains() == null || autoCD.getSubdomains().isEmpty()) {
+            autoCD.setSubdomains(List.of(Util.buildSubdomain(buildType, Util.hash(autoCD.getIdentifierRegistryImagePath()).substring(0, 5))));
         }
     }
 
@@ -236,7 +236,7 @@ public class Main {
         validateConfig(autoCD);
         if (!autoCD.getOtherImages().isEmpty()) {
             autoCD.getOtherImages().forEach(config -> {
-                populateSubdomain(config, buildType, autoCD.getSubdomains());
+                populateSubdomain(config, buildType, autoCD.getSubdomainsEnv());
 
                 if (!config.getOtherImages().isEmpty()) {
                     deployWithDependencies(config, k8sClient, buildType);
