@@ -630,7 +630,7 @@ public class K8sClient {
 
         final ExtensionsV1beta1IngressRuleBuilder[] rules = {new ExtensionsV1beta1IngressRuleBuilder()};
 
-        autoCD.getSubdomains().forEach(subdomain -> rules[0] = rules[0].withHost(subdomain)
+        autoCD.getSubdomains().forEach(subdomain -> rules[0] = rules[0].withNewHost(subdomain)
                 .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
                         .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
                                 .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
