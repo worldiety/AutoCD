@@ -626,7 +626,7 @@ public class K8sClient {
             var ingress = new ExtensionsV1beta1Ingress();
             ingress.setKind("Ingress");
             var meta = getNamespacedMeta();
-            meta.setName(Util.hash(getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
+            meta.setName(Util.hash(subdomain + getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
             meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
                     "kubernetes.io/ingress.class", "nginx"));
 
