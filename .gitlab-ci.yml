@@ -32,4 +32,3 @@ deploy-dev:
     AUTOCD_TOKEN: ${DEV_TOKEN}
   only:
     - develop
-    -
