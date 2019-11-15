@@ -90,29 +90,29 @@ public class DockerfileHandler {
      */
     @Contract(pure = true)
     private FileType mapFileTypeToFileType(@NotNull String ext) {
-        switch (ext) {
-            case "go":
-                return FileType.GO;
-            case "java":
-                return FileType.JAVA;
-            case "vue":
-                var isNuxt = new File("nuxt.config.js").exists();
-                return isNuxt ? FileType.NUXT : FileType.VUE;
-            case "ts":
-            case "js":
-                var packageJson = new File("package.json");
+        //noinspection IfCanBeSwitch
+        if ("go".equals(ext)) {
+            return FileType.GO;
+        } else if ("java".equals(ext)) {
+            return FileType.JAVA;
+        } else if ("vue".equals(ext)) {
+            var isNuxt = new File("nuxt.config.js").exists();
+            return isNuxt ? FileType.NUXT : FileType.VUE;
+        } else if ("ts".equals(ext) || "js".equals(ext)) {
+            var packageJson = new File("package.json");
 
-                try {
-                    var packStr = Files.readString(packageJson.toPath());
-                    if (packStr.contains("@kloudsoftware/eisen")) {
-                        return FileType.EISEN;
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+            try {
+                var packStr = Files.readString(packageJson.toPath());
+                if (packStr.contains("@kloudsoftware/eisen")) {
+                    return FileType.EISEN;
                 }
-            default:
-                return FileType.OTHER;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return FileType.OTHER;
         }
+        return FileType.OTHER;
     }
 
 
