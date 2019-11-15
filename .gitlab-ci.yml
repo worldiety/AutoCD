@@ -12,7 +12,7 @@ stages:
   script:
     - ./gradlew clean jar
     - echo ${AUTOCD_URL}
-    - curl -vsSfLX POST ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
+    - curl -vsSfLX POST -H "Content-Type: multipart/form-data" ${AUTOCD_URL} -F token=${AUTOCD_TOKEN} -F autocd=@build/libs/AutoCD-1.0.jar
   tags:
     - docker-build-runner
 
