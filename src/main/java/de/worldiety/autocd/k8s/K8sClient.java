@@ -609,6 +609,7 @@ public class K8sClient {
                     .filter(it -> !it.getMetadata().getNamespace().equals(getNamespaceString()))
                     .anyMatch(it ->
                             it.getSpec().getRules().stream()
+                                    .filter(rule -> rule != null && rule.getHost() != null)
                                     .anyMatch(rule -> autoCD.getSubdomains().contains(rule.getHost())));
 
             if (ingressWithHostAlreadyPresent) {
