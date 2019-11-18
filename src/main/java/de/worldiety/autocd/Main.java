@@ -183,6 +183,7 @@ public class Main {
     private static void populateSubdomain(AutoCD autoCD, String buildType, Map<String, List<String>> subdomains) {
         if (autoCD.getSubdomainsEnv() != null && subdomains.keySet().size() != 0) {
             autoCD.setSubdomains(autoCD.getSubdomainsEnv().get(buildType));
+            return;
         }
 
         if (autoCD.getSubdomains() == null || autoCD.getSubdomains().isEmpty()) {
