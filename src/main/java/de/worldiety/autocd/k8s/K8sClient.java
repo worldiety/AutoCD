@@ -868,7 +868,7 @@ public class K8sClient {
             return "local-default-name";
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString()) + hyphenedBuildType;
+        return System.getenv(Environment.CI_PROJECT_NAME.toString().replace("_", "-")) + hyphenedBuildType;
     }
 
     @NotNull
