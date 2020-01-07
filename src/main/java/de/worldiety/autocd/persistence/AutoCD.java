@@ -20,7 +20,7 @@ public class AutoCD {
     private List<AutoCD> otherImages = new ArrayList<>();
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
-    private List<String> subdomains;
+    private List<String> subdomains = new ArrayList<>();
 
 
     public AutoCD() {
