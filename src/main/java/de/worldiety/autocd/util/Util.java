@@ -68,6 +68,7 @@ public class Util {
         if (toSlug == null) {
             return null;
         }
-        return toSlug.replaceAll("[^a-zA-Z\\-]", "").substring(0, Integer.min(toSlug.length(), 255));
+        String slugified = toSlug.replaceAll("[^a-zA-Z\\-]", "");
+        return slugified.substring(0, Integer.min(slugified.length(), 255));
     }
 }
