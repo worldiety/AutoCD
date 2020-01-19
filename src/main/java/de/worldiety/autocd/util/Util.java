@@ -51,7 +51,6 @@ public class Util {
         return hexString.toString();
     }
 
-
     public static String hash(String toHash) {
         MessageDigest digest = null;
         try {
@@ -63,5 +62,12 @@ public class Util {
                 toHash.getBytes(StandardCharsets.UTF_8));
 
         return Util.bytesToHex(encodedhash);
+    }
+
+    public static String slugify(String toSlug) {
+        if (toSlug == null) {
+            return null;
+        }
+        return toSlug.replaceAll("[^a-zA-Z\\-]", "").substring(0, Integer.min(toSlug.length(), 255));
     }
 }
