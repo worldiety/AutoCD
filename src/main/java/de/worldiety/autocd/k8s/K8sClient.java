@@ -577,8 +577,8 @@ public class K8sClient {
     @NotNull
     private String getPVCName(Volume volume, @NotNull AutoCD autoCD) {
         // TODO: we should switch to an unhashed version for readability reasons - what is the best way to migrate the old porjects?
-//        var str = getNamespaceString() + "--" + getServiceName(autoCD) + "--" + "claim" + autoCD.getVolumes().indexOf(volume);
-//        return Util.slugify(str);
+        //var str = getNamespaceString() + "--" + getServiceName(autoCD) + "--" + "claim" + autoCD.getVolumes().indexOf(volume);
+        //return Util.slugify(str);
 
         var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getIdentifierRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
         return hash(str).substring(0, 20);
