@@ -65,10 +65,14 @@ public class Util {
     }
 
     public static String slugify(String toSlug) {
+        return slugify(toSlug, 255);
+    }
+
+    public static String slugify(String toSlug, int maxLength) {
         if (toSlug == null) {
             return null;
         }
-        String slugified = toSlug.replaceAll("[^a-zA-Z\\-]", "");
-        return slugified.substring(0, Integer.min(slugified.length(), 255));
+        String slugified = toSlug.toLowerCase().replaceAll("[^a-z0-9\\-]", "");
+        return slugified.substring(0, Integer.min(slugified.length(), maxLength));
     }
 }

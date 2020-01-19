@@ -695,7 +695,14 @@ public class K8sClient {
             return autoCD.getServiceName();
         }
 
-        return Util.slugify("service--" + getName());
+        String serviceName = "service--" + getName();
+
+        // Validate the length of the new service name - should be less then 63 characters:
+        // https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/discovery/types.go#L122-L130
+        if (serviceName.length() > 63) {
+            throw new IllegalArgumentException("The service name MUST NOT have more then 63 characters!");
+        }
+        return serviceName;
     }
 
     @NotNull
