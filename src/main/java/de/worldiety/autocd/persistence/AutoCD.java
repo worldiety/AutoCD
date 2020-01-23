@@ -1,9 +1,12 @@
 package de.worldiety.autocd.persistence;
 
+import de.worldiety.autocd.util.FileType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class AutoCD {
     private int containerPort = 8080;
@@ -21,12 +24,12 @@ public class AutoCD {
     private List<String> args = new ArrayList<>();
     private String serviceName = null;
     private List<String> subdomains = new ArrayList<>();
-
+    private Resources resources = null;
 
     public AutoCD() {
     }
 
-    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, Map<String, List<String>> subdomainsEnv, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName, List<String> subdomains) {
+    public AutoCD(int containerPort, int servicePort, int replicas, boolean publiclyAccessible, long terminationGracePeriod, String dockerImagePath, String registryImagePath, Map<String, List<String>> subdomainsEnv, boolean shouldHost, List<Volume> volumes, Map<String, Map<String, String>> environmentVariables, List<AutoCD> otherImages, List<String> args, String serviceName, List<String> subdomains, Resources resources) {
         this.containerPort = containerPort;
         this.servicePort = servicePort;
         this.replicas = replicas;
@@ -42,6 +45,36 @@ public class AutoCD {
         this.args = args;
         this.serviceName = serviceName;
         this.subdomains = subdomains;
+        this.resources = resources;
+    }
+
+    /**
+     * Get the default {@link AutoCD.Resources} for a given {@link FileType}.
+     * <p>
+     * We use the default values of no {@link FileType} is provided or it is {@link FileType.OTHER}.
+     *
+     * @param fileType
+     * @return
+     */
+    public static @NotNull AutoCD.Resources getDefaultLimitRangeFor(@Nullable FileType fileType) {
+
+        AutoCD.Resources defaultResources = new AutoCD.Resources("0.1", "0.01", "250Mi", "50Mi");
+        if (fileType == null) {
+            return defaultResources;
+        }
+
+        switch (fileType) {
+            case JAVA:
+                return new AutoCD.Resources("0.15", "0.05", "500Mi", "200Mi");
+            case GO:
+                return new AutoCD.Resources("0.1", "0.001", "50Mi", "5Mi");
+            case VUE:
+            case NUXT:
+            case EISEN:
+                return new AutoCD.Resources("0.1", "0.01", "15Mi", "10Mi");
+            default:
+                return defaultResources;
+        }
     }
 
     public int getReplicas() {
@@ -166,5 +199,76 @@ public class AutoCD {
 
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
+    }
+
+    public Resources getResources() {
+        return resources;
+    }
+
+    public void setResources(Resources resources) {
+        this.resources = resources;
+    }
+
+    public static class Resources {
+        private ResourceValues limits;
+        private ResourceValues requests;
+
+        public Resources(String cpuLimit, String cpuRequest, String ramLimit, String ramRequest) {
+            this.limits = new ResourceValues(cpuLimit, ramLimit);
+            this.requests = new ResourceValues(cpuRequest, ramRequest);
+        }
+
+        public Resources(ResourceValues limits, ResourceValues requests) {
+            this.limits = limits;
+            this.requests = requests;
+        }
+
+        public Resources() {
+        }
+
+        public ResourceValues getLimits() {
+            return limits;
+        }
+
+        public void setLimits(ResourceValues value) {
+            this.limits = value;
+        }
+
+        public ResourceValues getRequests() {
+            return requests;
+        }
+
+        public void setRequests(ResourceValues value) {
+            this.requests = value;
+        }
+
+        public static class ResourceValues {
+            private String cpu;
+            private String memory;
+
+            public ResourceValues(String cpu, String memory) {
+                this.cpu = cpu;
+                this.memory = memory;
+            }
+
+            public ResourceValues() {
+            }
+
+            public String getCPU() {
+                return cpu;
+            }
+
+            public void setCPU(String value) {
+                this.cpu = value;
+            }
+
+            public String getMemory() {
+                return memory;
+            }
+
+            public void setMemory(String value) {
+                this.memory = value;
+            }
+        }
     }
 }
