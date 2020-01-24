@@ -1,7 +1,8 @@
 on:
   push:
-    branches:
-      - master
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - '*'
 
 name: Create Release
 
@@ -12,21 +13,23 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
-      - name: Bump version and push tag
-        uses: anothrNick/github-tag-action@master
-        id: tag_bump
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: false
-          DEFAULT_BUMP: patch
+      # - name: Bump version and push tag
+      #   uses: anothrNick/github-tag-action@master
+      #   id: tag_bump
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     WITH_V: false
+      #     DEFAULT_BUMP: patch
       - name: Create Release
         id: create_release
         uses: actions/create-release@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.tag_bump.outputs.new_tag }}
-          release_name: Release ${{ steps.tag_bump.outputs.new_tag }}
+          # tag_name: ${{ steps.tag_bump.outputs.new_tag }}
+          # release_name: Release ${{ steps.tag_bump.outputs.new_tag }}
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
       - uses: MrRamych/gradle-actions/openjdk-12@3.1
