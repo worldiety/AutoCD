@@ -199,7 +199,7 @@ table below for parameters to specify. As an example, here is a JSON file
       "volumes": [
         {
           "volumeMount": "/var/redis",
-          "filePermission": "777"
+          "folderPermission": "777"
         }
       ],
       "registryImagePath": "redis:latest",
