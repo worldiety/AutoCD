@@ -71,7 +71,7 @@ public class AutoCD {
             case VUE:
             case NUXT:
             case EISEN:
-                return new AutoCD.Resources("0.1", "0.01", "35Mi", "17Mi");
+                return new AutoCD.Resources("0.1", "0.01", "70Mi", "15Mi");
             default:
                 return defaultResources;
         }
