@@ -196,7 +196,14 @@ public class K8sClient {
 
         spec.setVolumeClaimTemplates(templates);
 
-        V1ContainerBuilder containerBuilder = getV1ContainerBuilder(autoCD);
+        var securityContextBuilder = getV1ContainerBuilder(autoCD).editOrNewSecurityContext();
+        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
+        securityContextBuilder = securityContextBuilder.withPrivileged(false);
+        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+
+        var containerBuilder = securityContextBuilder.endSecurityContext();
 
         var neededInitContainer = new ArrayList<V1Container>();
         if (!autoCD.getVolumes().isEmpty()) {
@@ -218,13 +225,6 @@ public class K8sClient {
 
             containerBuilder = containerBuilder.withVolumeMounts(volumes);
         }
-        var securityContextBuilder = containerBuilder.editSecurityContext();
-        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
-        securityContextBuilder = securityContextBuilder.withPrivileged(false);
-        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
-        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
-        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
-        containerBuilder = securityContextBuilder.endSecurityContext();
 
         var container = containerBuilder.build();
 
