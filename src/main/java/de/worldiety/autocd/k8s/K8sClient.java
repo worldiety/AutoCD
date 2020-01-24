@@ -119,7 +119,7 @@ public class K8sClient {
         var nameSpace = getNamespace();
 
         createNamespace(nameSpace);
-        createNamespacedLimitRange(nameSpace.getMetadata().getNamespace());
+        createNamespacedLimitRange(getNamespaceString());
         addSecret();
 
         createStatefulSet(set);
@@ -179,6 +179,7 @@ public class K8sClient {
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
+        podSpec.getSecurityContext().setRunAsNonRoot(true);
         template.setSpec(podSpec);
 
         podSpec.setTerminationGracePeriodSeconds(autoCD.getTerminationGracePeriod());
@@ -217,6 +218,13 @@ public class K8sClient {
 
             containerBuilder = containerBuilder.withVolumeMounts(volumes);
         }
+        var securityContextBuilder = containerBuilder.editSecurityContext();
+        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
+        securityContextBuilder = securityContextBuilder.withPrivileged(false);
+        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+        containerBuilder = securityContextBuilder.endSecurityContext();
 
         var container = containerBuilder.build();
 
@@ -278,7 +286,7 @@ public class K8sClient {
         cleanupPVC(nameSpace.getMetadata().getName(), claims);
 
         createNamespace(nameSpace);
-        createNamespacedLimitRange(nameSpace.getMetadata().getNamespace());
+        createNamespacedLimitRange(getNamespaceString());
         addSecret();
 
         createClaims(claims);
@@ -1006,7 +1014,7 @@ public class K8sClient {
             defaultLimits.put("cpu", Quantity.fromString(resources.getLimits().getCPU()));
         }
         if (resources.getLimits() != null && resources.getLimits().getMemory() != null) {
-            defaultLimits.put("memory", Quantity.fromString(resources.getLimits().getCPU()));
+            defaultLimits.put("memory", Quantity.fromString(resources.getLimits().getMemory()));
         }
         v1LimitRangeItem.setDefault(defaultLimits);
 

@@ -153,6 +153,15 @@ table below for parameters to specify. As an example, here is a JSON file
       "dev": "yourapp.dev.com",
       "edit": "yourapp.edit.com",
       "stage": "yourapp.com"
+    },
+    "resources": {
+      "limits": {
+        "cpu": "0.1",
+        "memory": "200Mi"
+    },
+    "requests": {
+      "cpu": "0.01",
+      "memory": "50Mi"
     }
   }
 ```
