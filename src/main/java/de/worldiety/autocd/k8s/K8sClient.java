@@ -29,7 +29,6 @@ import io.kubernetes.client.models.ExtensionsV1beta1IngressSpecBuilder;
 import io.kubernetes.client.models.ExtensionsV1beta1IngressTLSBuilder;
 import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
-import io.kubernetes.client.models.V1ContainerFluent;
 import io.kubernetes.client.models.V1ContainerPort;
 import io.kubernetes.client.models.V1EnvVar;
 import io.kubernetes.client.models.V1EnvVarBuilder;
@@ -195,14 +194,8 @@ public class K8sClient {
         }).collect(Collectors.toList());
 
         spec.setVolumeClaimTemplates(templates);
-        var securityContextBuilder = getV1ContainerBuilder(autoCD).editOrNewSecurityContext();
-        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
-        securityContextBuilder = securityContextBuilder.withPrivileged(false);
-        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
-        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
-        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
 
-        var containerBuilder = securityContextBuilder.endSecurityContext();
+        var containerBuilder = getV1ContainerBuilder(autoCD);
 
         var neededInitContainer = new ArrayList<V1Container>();
         if (!autoCD.getVolumes().isEmpty()) {
@@ -226,9 +219,6 @@ public class K8sClient {
         }
 
         var container = containerBuilder.build();
-        System.out.println(container.getSecurityContext().getRunAsUser());
-        System.out.print("isPrivilegded ");
-        System.out.println(container.getSecurityContext().isPrivileged());
 
         podSpec.setContainers(List.of(container));
 
@@ -783,7 +773,7 @@ public class K8sClient {
         }
 
         // set the resources and limits
-        V1ContainerFluent.ResourcesNested<V1ContainerBuilder> resourceBuilder = getV1ContainerBuilder(autoCD).withNewResources();
+        var resourceBuilder = getV1ContainerBuilder(autoCD).withNewResources();
         V1LimitRangeItem limitRangeItem = generateV1LimitRange(autoCD).getSpec().getLimits().get(0);
         resourceBuilder = resourceBuilder.addToLimits(limitRangeItem.getDefault());
         resourceBuilder = resourceBuilder.addToRequests(limitRangeItem.getDefaultRequest());
@@ -829,7 +819,7 @@ public class K8sClient {
     }
 
     private V1ContainerBuilder getV1ContainerBuilder(@NotNull AutoCD autoCD) {
-        V1ContainerPort port = getV1ContainerPort(autoCD);
+        final V1ContainerPort port = getV1ContainerPort(autoCD);
 
         List<V1EnvVar> variables = new ArrayList<>();
         if (autoCD.getEnvironmentVariables() != null) {
@@ -842,7 +832,15 @@ public class K8sClient {
             }
         }
 
-        return new V1ContainerBuilder()
+        // set security fixes
+        var securityContextBuilder = new V1ContainerBuilder().editOrNewSecurityContext();
+        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
+        securityContextBuilder = securityContextBuilder.withPrivileged(false);
+        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+
+        return securityContextBuilder.endSecurityContext()
                 .withImage(autoCD.getRegistryImagePath())
                 .withName(getName() + "-c")
                 .withPorts(port)
