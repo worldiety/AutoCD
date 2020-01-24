@@ -179,8 +179,6 @@ public class K8sClient {
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
-        podSpec.getSecurityContext().setRunAsUser(10123L);
-        podSpec.getSecurityContext().setRunAsGroup(10123L);
         podSpec.getSecurityContext().setRunAsNonRoot(true);
         template.setSpec(podSpec);
 
@@ -220,6 +218,13 @@ public class K8sClient {
 
             containerBuilder = containerBuilder.withVolumeMounts(volumes);
         }
+        var securityContextBuilder = containerBuilder.editSecurityContext();
+        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
+        securityContextBuilder = securityContextBuilder.withPrivileged(false);
+        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+        containerBuilder = securityContextBuilder.endSecurityContext();
 
         var container = containerBuilder.build();
 
