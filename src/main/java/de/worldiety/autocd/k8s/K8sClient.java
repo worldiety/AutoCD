@@ -195,7 +195,6 @@ public class K8sClient {
         }).collect(Collectors.toList());
 
         spec.setVolumeClaimTemplates(templates);
-
         var securityContextBuilder = getV1ContainerBuilder(autoCD).editOrNewSecurityContext();
         securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
         securityContextBuilder = securityContextBuilder.withPrivileged(false);
@@ -227,6 +226,9 @@ public class K8sClient {
         }
 
         var container = containerBuilder.build();
+        System.out.println(container.getSecurityContext().getRunAsUser());
+        System.out.print("isPrivilegded ");
+        System.out.println(container.getSecurityContext().isPrivileged());
 
         podSpec.setContainers(List.of(container));
 
