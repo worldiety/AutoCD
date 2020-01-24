@@ -33,6 +33,9 @@ import io.kubernetes.client.models.V1ContainerPort;
 import io.kubernetes.client.models.V1EnvVar;
 import io.kubernetes.client.models.V1EnvVarBuilder;
 import io.kubernetes.client.models.V1LabelSelector;
+import io.kubernetes.client.models.V1LimitRange;
+import io.kubernetes.client.models.V1LimitRangeItem;
+import io.kubernetes.client.models.V1LimitRangeSpec;
 import io.kubernetes.client.models.V1LocalObjectReference;
 import io.kubernetes.client.models.V1Namespace;
 import io.kubernetes.client.models.V1ObjectMeta;
@@ -53,16 +56,19 @@ import io.kubernetes.client.models.V1ServiceSpec;
 import io.kubernetes.client.models.V1StatefulSet;
 import io.kubernetes.client.models.V1StatefulSetSpec;
 import io.kubernetes.client.models.V1Volume;
+import io.kubernetes.client.models.V1VolumeBuilder;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +119,9 @@ public class K8sClient {
         var nameSpace = getNamespace();
 
         createNamespace(nameSpace);
+        createNamespacedLimitRange(getNamespaceString());
         addSecret();
+
         createStatefulSet(set);
         createService(service);
         ingress.forEach(this::createIngress);
@@ -171,23 +179,32 @@ public class K8sClient {
         template.setMetadata(templateMeta);
 
         var podSpec = new V1PodSpec();
+        podSpec.getSecurityContext().setRunAsNonRoot(true);
         template.setSpec(podSpec);
 
         podSpec.setTerminationGracePeriodSeconds(autoCD.getTerminationGracePeriod());
 
         spec.setTemplate(template);
 
-        var templates = autoCD.getVolumes().stream().map(vol -> {
-            var volTemp = new V1PersistentVolumeClaim();
-            volTemp.setMetadata(new V1ObjectMetaBuilder().withName(getVolumeName(vol, autoCD)).build());
-            V1PersistentVolumeClaimSpec volumeClaimSpec = getV1PersistentVolumeClaimSpec(vol);
-            volTemp.setSpec(volumeClaimSpec);
-            return volTemp;
-        }).collect(Collectors.toList());
+        for (Volume volume: autoCD.getVolumes()) {
+            var volumeName = getVolumeName(volume, autoCD);
 
-        spec.setVolumeClaimTemplates(templates);
+            if (volume.isRetainVolume()) {
+                var volTemp = new V1PersistentVolumeClaim();
+                volTemp.setMetadata(new V1ObjectMetaBuilder().withName(volumeName).build());
+                V1PersistentVolumeClaimSpec volumeClaimSpec = getV1PersistentVolumeClaimSpec(volume);
+                volTemp.setSpec(volumeClaimSpec);
+                spec.addVolumeClaimTemplatesItem(volTemp);
+            } else {
+                // set empty dirs: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+                var builder = new V1VolumeBuilder();
+                builder.withName(volumeName);
+                builder = builder.withNewEmptyDir().endEmptyDir();
+                podSpec.addVolumesItem(builder.build());
+            }
+        }
 
-        V1ContainerBuilder containerBuilder = getV1ContainerBuilder(autoCD);
+        var containerBuilder = getV1ContainerBuilder(autoCD);
 
         var neededInitContainer = new ArrayList<V1Container>();
         if (!autoCD.getVolumes().isEmpty()) {
@@ -270,7 +287,9 @@ public class K8sClient {
         cleanupPVC(nameSpace.getMetadata().getName(), claims);
 
         createNamespace(nameSpace);
+        createNamespacedLimitRange(getNamespaceString());
         addSecret();
+
         createClaims(claims);
         createDeployment(deployment);
         createService(service);
@@ -570,8 +589,15 @@ public class K8sClient {
         } catch (ApiException e) {
             retry(nameSpace, this::createNamespace, e);
         }
+    }
 
-
+    private void createNamespacedLimitRange(String nameSpaceString) {
+        try {
+            // we do not provide a AutoCD config here, because the LimitRange should be selected by the project FileType
+            api.createNamespacedLimitRange(nameSpaceString, generateV1LimitRange(null), "true", null, null);
+        } catch (ApiException e) {
+            retry(nameSpaceString, this::createNamespacedLimitRange, e);
+        }
     }
 
     @NotNull
@@ -755,7 +781,14 @@ public class K8sClient {
             }).collect(Collectors.toList()));
         }
 
-        V1ContainerBuilder containerBuilder = getV1ContainerBuilder(autoCD);
+        // set the resources and limits
+        var resourceBuilder = getV1ContainerBuilder(autoCD).withNewResources();
+        V1LimitRangeItem limitRangeItem = generateV1LimitRange(autoCD).getSpec().getLimits().get(0);
+        resourceBuilder = resourceBuilder.addToLimits(limitRangeItem.getDefault());
+        resourceBuilder = resourceBuilder.addToRequests(limitRangeItem.getDefaultRequest());
+
+        // create container builder
+        V1ContainerBuilder containerBuilder = resourceBuilder.endResources();
 
         var neededInitContainer = new ArrayList<V1Container>();
         if (!autoCD.getVolumes().isEmpty()) {
@@ -795,7 +828,7 @@ public class K8sClient {
     }
 
     private V1ContainerBuilder getV1ContainerBuilder(@NotNull AutoCD autoCD) {
-        V1ContainerPort port = getV1ContainerPort(autoCD);
+        final V1ContainerPort port = getV1ContainerPort(autoCD);
 
         List<V1EnvVar> variables = new ArrayList<>();
         if (autoCD.getEnvironmentVariables() != null) {
@@ -808,7 +841,15 @@ public class K8sClient {
             }
         }
 
-        return new V1ContainerBuilder()
+        // set security fixes
+        var securityContextBuilder = new V1ContainerBuilder().editOrNewSecurityContext();
+        securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
+        securityContextBuilder = securityContextBuilder.withPrivileged(false);
+        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+
+        return securityContextBuilder.endSecurityContext()
                 .withImage(autoCD.getRegistryImagePath())
                 .withName(getName() + "-c")
                 .withPorts(port)
@@ -868,7 +909,7 @@ public class K8sClient {
             return "local-default-name";
         }
 
-        return System.getenv(Environment.CI_PROJECT_NAME.toString().replace("_", "-")) + hyphenedBuildType;
+        return System.getenv(Environment.CI_PROJECT_NAME.toString()).replace("_", "-") + hyphenedBuildType;
     }
 
     @NotNull
@@ -949,6 +990,58 @@ public class K8sClient {
 
         log.error("Unknown error", e);
         log.info(e.getResponseBody());
+    }
+
+    /**
+     * Generate a {@link V1LimitRange} from a {@link AutoCD} config.
+     * If no config is provided, we use the default values for the projects {@link FileType}.
+     *
+     * @param autoCD
+     * @return
+     */
+    private V1LimitRange generateV1LimitRange(@Nullable AutoCD autoCD) {
+        V1LimitRange v1LimitRange = new V1LimitRange();
+        // set metadata
+        V1ObjectMeta v1ObjectMeta = new V1ObjectMeta();
+        v1ObjectMeta.setName(getNamespaceString() + "-limitrange");
+        //v1ObjectMeta.setLabels(Map.of("type", "");
+        v1LimitRange.setMetadata(v1ObjectMeta);
+
+        // set item
+        V1LimitRangeItem v1LimitRangeItem = new V1LimitRangeItem();
+        v1LimitRangeItem.setType("Container");
+
+        AutoCD.Resources resources;
+        if (autoCD != null && autoCD.getResources() != null) {
+            resources = autoCD.getResources();
+        } else {
+            resources = AutoCD.getDefaultLimitRangeFor(finder.getFileType());
+        }
+
+        Map<String, Quantity> defaultLimits = new HashMap<>();
+        if (resources.getLimits() != null && resources.getLimits().getCPU() != null) {
+            defaultLimits.put("cpu", Quantity.fromString(resources.getLimits().getCPU()));
+        }
+        if (resources.getLimits() != null && resources.getLimits().getMemory() != null) {
+            defaultLimits.put("memory", Quantity.fromString(resources.getLimits().getMemory()));
+        }
+        v1LimitRangeItem.setDefault(defaultLimits);
+
+        Map<String, Quantity> defaultRequests = new HashMap<>();
+        if (resources.getRequests() != null && resources.getRequests().getCPU() != null) {
+            defaultRequests.put("cpu", Quantity.fromString(resources.getRequests().getCPU()));
+        }
+        if (resources.getRequests() != null && resources.getRequests().getMemory() != null) {
+            defaultRequests.put("memory", Quantity.fromString(resources.getRequests().getMemory()));
+        }
+        v1LimitRangeItem.setDefaultRequest(defaultRequests);
+
+        // set spec
+        V1LimitRangeSpec v1LimitRangeSpec = new V1LimitRangeSpec();
+        v1LimitRangeSpec.addLimitsItem(v1LimitRangeItem);
+        v1LimitRange.setSpec(v1LimitRangeSpec);
+
+        return v1LimitRange;
     }
 }
 
