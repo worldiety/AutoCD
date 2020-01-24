@@ -51,10 +51,10 @@ public class AutoCD {
     /**
      * Get the default {@link AutoCD.Resources} for a given {@link FileType}.
      * <p>
-     * We use the default values of no {@link FileType} is provided or it is {@link FileType.OTHER}.
+     * We use the default values if no {@link FileType} or {@link FileType#OTHER} is provided.
      *
-     * @param fileType
-     * @return
+     * @param fileType The type of files in this project
+     * @return Limits and requests for cpu and memory
      */
     public static @NotNull AutoCD.Resources getDefaultLimitRangeFor(@Nullable FileType fileType) {
 
