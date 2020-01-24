@@ -56,6 +56,7 @@ import io.kubernetes.client.models.V1ServiceSpec;
 import io.kubernetes.client.models.V1StatefulSet;
 import io.kubernetes.client.models.V1StatefulSetSpec;
 import io.kubernetes.client.models.V1Volume;
+import io.kubernetes.client.models.V1VolumeBuilder;
 import io.kubernetes.client.models.V1VolumeMount;
 import io.kubernetes.client.models.V1VolumeMountBuilder;
 import java.util.ArrayList;
@@ -185,15 +186,23 @@ public class K8sClient {
 
         spec.setTemplate(template);
 
-        var templates = autoCD.getVolumes().stream().map(vol -> {
-            var volTemp = new V1PersistentVolumeClaim();
-            volTemp.setMetadata(new V1ObjectMetaBuilder().withName(getVolumeName(vol, autoCD)).build());
-            V1PersistentVolumeClaimSpec volumeClaimSpec = getV1PersistentVolumeClaimSpec(vol);
-            volTemp.setSpec(volumeClaimSpec);
-            return volTemp;
-        }).collect(Collectors.toList());
+        for (Volume volume: autoCD.getVolumes()) {
+            var volumeName = getVolumeName(volume, autoCD);
 
-        spec.setVolumeClaimTemplates(templates);
+            if (volume.isRetainVolume()) {
+                var volTemp = new V1PersistentVolumeClaim();
+                volTemp.setMetadata(new V1ObjectMetaBuilder().withName(volumeName).build());
+                V1PersistentVolumeClaimSpec volumeClaimSpec = getV1PersistentVolumeClaimSpec(volume);
+                volTemp.setSpec(volumeClaimSpec);
+                spec.addVolumeClaimTemplatesItem(volTemp);
+            } else {
+                // set empty dirs: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+                var builder = new V1VolumeBuilder();
+                builder.withName(volumeName);
+                builder = builder.withNewEmptyDir().endEmptyDir();
+                podSpec.addVolumesItem(builder.build());
+            }
+        }
 
         var containerBuilder = getV1ContainerBuilder(autoCD);
 
