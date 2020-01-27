@@ -847,7 +847,7 @@ public class K8sClient {
         securityContextBuilder = securityContextBuilder.withPrivileged(false);
         securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
         securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
-        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
+        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(false);
 
         return securityContextBuilder.endSecurityContext()
                 .withImage(autoCD.getRegistryImagePath())
