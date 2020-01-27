@@ -845,9 +845,9 @@ public class K8sClient {
         var securityContextBuilder = new V1ContainerBuilder().editOrNewSecurityContext();
         securityContextBuilder = securityContextBuilder.withAllowPrivilegeEscalation(false);
         securityContextBuilder = securityContextBuilder.withPrivileged(false);
-        securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
-        securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
-        securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(false);
+        //securityContextBuilder = securityContextBuilder.withRunAsUser(10123L);
+        //securityContextBuilder = securityContextBuilder.withRunAsGroup(10123L);
+        //securityContextBuilder = securityContextBuilder.withReadOnlyRootFilesystem(true);
 
         return securityContextBuilder.endSecurityContext()
                 .withImage(autoCD.getRegistryImagePath())
