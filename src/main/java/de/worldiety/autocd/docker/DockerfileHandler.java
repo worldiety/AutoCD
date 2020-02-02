@@ -90,6 +90,10 @@ public class DockerfileHandler {
         if ("go".equals(ext)) {
             return FileType.GO;
         } else if (".rs".equals(ext)) {
+            var rocketConfig = new File("Rocket.toml");
+            if (rocketConfig.isFile()) {
+                return FileType.RUST_ROCKET;
+            }
             return FileType.RUST;
         } else if ("java".equals(ext)) {
             return FileType.JAVA;
