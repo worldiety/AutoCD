@@ -58,20 +58,20 @@ public class AutoCD {
      */
     public static @NotNull AutoCD.Resources getDefaultLimitRangeFor(@Nullable FileType fileType) {
 
-        AutoCD.Resources defaultResources = new AutoCD.Resources("0.1", "0.01", "250Mi", "50Mi");
+        AutoCD.Resources defaultResources = new AutoCD.Resources("0.1", "0.005", "250Mi", "60Mi");
         if (fileType == null) {
             return defaultResources;
         }
 
         switch (fileType) {
             case JAVA:
-                return new AutoCD.Resources("0.15", "0.05", "500Mi", "200Mi");
+                return new AutoCD.Resources("0.075", "0.001", "400Mi", "250Mi");
             case GO:
-                return new AutoCD.Resources("0.1", "0.001", "50Mi", "5Mi");
+                return new AutoCD.Resources("0.075", "0.001", "50Mi", "5Mi");
             case VUE:
             case NUXT:
             case EISEN:
-                return new AutoCD.Resources("0.1", "0.01", "70Mi", "15Mi");
+                return new AutoCD.Resources("0.075", "0.001", "70Mi", "15Mi");
             default:
                 return defaultResources;
         }
