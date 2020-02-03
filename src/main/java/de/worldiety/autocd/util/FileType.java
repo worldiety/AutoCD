@@ -8,6 +8,7 @@ public enum FileType {
     VUE("vue", "vue-builder", "vue-prod", "RUN npm run build\n"),
     NUXT("vue", "nuxt-builder", "nuxt-prod", "RUN npm i && npm run build"),
     EISEN("eisen", "vue-builder", "vue-prod", "RUN npm run build\n"),
+    SWIFT("swift", "swift-builder", "swift-prod", "RUN swift build -c release && mv `swift build -c release --show-bin-path` /build/bin"),
     RUST("rust", "rust-builder", "rust-prod", "RUN rust-autocd-builder ."),
     RUST_ROCKET("rust", "rust-builder", "rust-rocket-prod", "RUN rust-autocd-builder ."),
     OTHER("other");

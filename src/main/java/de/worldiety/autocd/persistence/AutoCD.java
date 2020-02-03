@@ -74,6 +74,8 @@ public class AutoCD {
             case NUXT:
             case EISEN:
                 return new AutoCD.Resources("0.075", "0.001", "70Mi", "15Mi");
+            case SWIFT:
+                return new AutoCD.Resources("0.1", "0.01", "150Mi", "75Mi");
             default:
                 return defaultResources;
         }

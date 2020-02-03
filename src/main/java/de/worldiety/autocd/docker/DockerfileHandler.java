@@ -104,6 +104,8 @@ public class DockerfileHandler {
         } else if ("vue".equals(ext)) {
             var isNuxt = new File("nuxt.config.js").exists();
             return isNuxt ? FileType.NUXT : FileType.VUE;
+        } else if ("swift".equals(ext)) {
+            return FileType.SWIFT;
         } else if ("ts".equals(ext) || "js".equals(ext)) {
             var packageJson = new File("package.json");
 
