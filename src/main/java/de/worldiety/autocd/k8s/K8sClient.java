@@ -15,18 +15,19 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
+import io.kubernetes.client.apis.NetworkingV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.custom.V1Patch;
 import io.kubernetes.client.models.ExtensionsV1beta1Deployment;
 import io.kubernetes.client.models.ExtensionsV1beta1DeploymentSpec;
-import io.kubernetes.client.models.ExtensionsV1beta1HTTPIngressPathBuilder;
-import io.kubernetes.client.models.ExtensionsV1beta1HTTPIngressRuleValueBuilder;
-import io.kubernetes.client.models.ExtensionsV1beta1Ingress;
-import io.kubernetes.client.models.ExtensionsV1beta1IngressBackendBuilder;
-import io.kubernetes.client.models.ExtensionsV1beta1IngressRuleBuilder;
-import io.kubernetes.client.models.ExtensionsV1beta1IngressSpecBuilder;
-import io.kubernetes.client.models.ExtensionsV1beta1IngressTLSBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1HTTPIngressPathBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1HTTPIngressRuleValueBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1Ingress;
+import io.kubernetes.client.models.NetworkingV1beta1IngressBackendBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1IngressRuleBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1IngressSpecBuilder;
+import io.kubernetes.client.models.NetworkingV1beta1IngressTLSBuilder;
 import io.kubernetes.client.models.V1Container;
 import io.kubernetes.client.models.V1ContainerBuilder;
 import io.kubernetes.client.models.V1ContainerPort;
@@ -380,8 +381,8 @@ public class K8sClient {
         }
     }
 
-    private void deleteIngress(@NotNull ExtensionsV1beta1Ingress ingress) {
-        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+    private void deleteIngress(@NotNull NetworkingV1beta1Ingress ingress) {
+        var extensionsV1beta1Api = getNetworkingV1beta1Api();
         try {
             extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
         } catch (ApiException e) {
@@ -550,8 +551,8 @@ public class K8sClient {
         }
     }
 
-    private void createIngress(ExtensionsV1beta1Ingress ingress) {
-        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+    private void createIngress(NetworkingV1beta1Ingress ingress) {
+        var extensionsV1beta1Api = getNetworkingV1beta1Api();
         try {
             extensionsV1beta1Api.createNamespacedIngress(ingress.getMetadata().getNamespace(), ingress, "true", null, null);
         } catch (ApiException e) {
@@ -562,6 +563,13 @@ public class K8sClient {
     @NotNull
     private ExtensionsV1beta1Api getExtensionsV1beta1Api() {
         var extensionsV1beta1Api = new ExtensionsV1beta1Api();
+        extensionsV1beta1Api.setApiClient(api.getApiClient());
+        return extensionsV1beta1Api;
+    }
+
+    @NotNull
+    private NetworkingV1beta1Api getNetworkingV1beta1Api() {
+        var extensionsV1beta1Api = new NetworkingV1beta1Api();
         extensionsV1beta1Api.setApiClient(api.getApiClient());
         return extensionsV1beta1Api;
     }
@@ -626,8 +634,8 @@ public class K8sClient {
         }).collect(Collectors.toList());
     }
 
-    private List<ExtensionsV1beta1Ingress> getIngress(@NotNull AutoCD autoCD) {
-        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+    private List<NetworkingV1beta1Ingress> getIngress(@NotNull AutoCD autoCD) {
+        var extensionsV1beta1Api = getNetworkingV1beta1Api();
         try {
             var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null);
             var ingressWithHostAlreadyPresent = ingresses.getItems()
@@ -646,32 +654,32 @@ public class K8sClient {
             log.error("Could not get Ingresses for all namespaces", e);
         }
 
-        List<ExtensionsV1beta1Ingress> returnList = new ArrayList<>();
+        List<NetworkingV1beta1Ingress> returnList = new ArrayList<>();
 
         for (String subdomain : autoCD.getSubdomains()) {
 
-            var ingress = new ExtensionsV1beta1Ingress();
+            var ingress = new NetworkingV1beta1Ingress();
             ingress.setKind("Ingress");
             var meta = getNamespacedMeta();
             meta.setName(Util.hash(subdomain + getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
             meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
                     "kubernetes.io/ingress.class", "nginx", "nginx.ingress.kubernetes.io/proxy-body-size", "1024m"));
 
-            var rules = new ExtensionsV1beta1IngressRuleBuilder();
+            var rules = new NetworkingV1beta1IngressRuleBuilder();
 
             rules.withHost(subdomain)
-                    .withHttp(new ExtensionsV1beta1HTTPIngressRuleValueBuilder()
-                            .withPaths(new ExtensionsV1beta1HTTPIngressPathBuilder().withPath("/")
-                                    .withBackend(new ExtensionsV1beta1IngressBackendBuilder()
+                    .withHttp(new NetworkingV1beta1HTTPIngressRuleValueBuilder()
+                            .withPaths(new NetworkingV1beta1HTTPIngressPathBuilder().withPath("/")
+                                    .withBackend(new NetworkingV1beta1IngressBackendBuilder()
                                             .withServiceName(getServiceName(autoCD))
                                             .withServicePort(new IntOrString(autoCD.getServicePort()))
                                             .build())
                                     .build())
                             .build());
 
-            var spec = new ExtensionsV1beta1IngressSpecBuilder()
+            var spec = new NetworkingV1beta1IngressSpecBuilder()
                     .withRules(rules.build())
-                    .withTls(new ExtensionsV1beta1IngressTLSBuilder()
+                    .withTls(new NetworkingV1beta1IngressTLSBuilder()
                             .withHosts(subdomain)
                             .withSecretName(Util.hash(subdomain).substring(0, 10))
                             .build())
