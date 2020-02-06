@@ -93,11 +93,19 @@ public class DockerfileHandler {
         //noinspection IfCanBeSwitch
         if ("go".equals(ext)) {
             return FileType.GO;
+        } else if (".rs".equals(ext)) {
+            var rocketConfig = new File("Rocket.toml");
+            if (rocketConfig.isFile()) {
+                return FileType.RUST_ROCKET;
+            }
+            return FileType.RUST;
         } else if ("java".equals(ext)) {
             return FileType.JAVA;
         } else if ("vue".equals(ext)) {
             var isNuxt = new File("nuxt.config.js").exists();
             return isNuxt ? FileType.NUXT : FileType.VUE;
+        } else if ("swift".equals(ext)) {
+            return FileType.SWIFT;
         } else if ("ts".equals(ext) || "js".equals(ext)) {
             var packageJson = new File("package.json");
 

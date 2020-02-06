@@ -1,0 +1,5 @@
+FROM fredlahde/rust-autocd-builder as builder
+
+WORKDIR /app
+COPY . .
+

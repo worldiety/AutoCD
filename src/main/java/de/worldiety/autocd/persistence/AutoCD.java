@@ -67,11 +67,15 @@ public class AutoCD {
             case JAVA:
                 return new AutoCD.Resources("0.075", "0.001", "400Mi", "250Mi");
             case GO:
+            case RUST:
+            case RUST_ROCKET:
                 return new AutoCD.Resources("0.075", "0.001", "50Mi", "5Mi");
             case VUE:
             case NUXT:
             case EISEN:
                 return new AutoCD.Resources("0.075", "0.001", "70Mi", "15Mi");
+            case SWIFT:
+                return new AutoCD.Resources("0.1", "0.01", "150Mi", "75Mi");
             default:
                 return defaultResources;
         }
