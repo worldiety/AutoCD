@@ -830,7 +830,7 @@ public class K8sClient {
         dep.setMetadata(meta);
         dep.setSpec(spec);
         dep.setKind("Deployment");
-        dep.setApiVersion(getApiVersionExtensionV1Beta1());
+        dep.setApiVersion("apps/v1");
         return dep;
     }
 
@@ -890,12 +890,6 @@ public class K8sClient {
                         .withMountPath("/data")
                         .build()
                 ).build();
-    }
-
-    @NotNull
-    @Contract(pure = true)
-    private String getApiVersionExtensionV1Beta1() {
-        return "extensions/v1beta1";
     }
 
     @NotNull
