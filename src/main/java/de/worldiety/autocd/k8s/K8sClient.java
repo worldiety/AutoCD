@@ -17,10 +17,7 @@ import io.kubernetes.client.custom.V1Patch;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.openapi.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.openapi.apis.NetworkingV1beta1Api;
-import io.kubernetes.client.openapi.models.ExtensionsV1beta1Deployment;
-import io.kubernetes.client.openapi.models.ExtensionsV1beta1DeploymentSpec;
 import io.kubernetes.client.openapi.models.NetworkingV1beta1HTTPIngressPathBuilder;
 import io.kubernetes.client.openapi.models.NetworkingV1beta1HTTPIngressRuleValueBuilder;
 import io.kubernetes.client.openapi.models.NetworkingV1beta1Ingress;
@@ -31,6 +28,8 @@ import io.kubernetes.client.openapi.models.NetworkingV1beta1IngressTLSBuilder;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1ContainerBuilder;
 import io.kubernetes.client.openapi.models.V1ContainerPort;
+import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1DeploymentSpec;
 import io.kubernetes.client.openapi.models.V1EnvVar;
 import io.kubernetes.client.openapi.models.V1EnvVarBuilder;
 import io.kubernetes.client.openapi.models.V1LabelSelector;
@@ -187,7 +186,7 @@ public class K8sClient {
 
         spec.setTemplate(template);
 
-        for (Volume volume: autoCD.getVolumes()) {
+        for (Volume volume : autoCD.getVolumes()) {
             var volumeName = getVolumeName(volume, autoCD);
 
             if (volume.isRetainVolume()) {
@@ -360,10 +359,10 @@ public class K8sClient {
         }
     }
 
-    private void deleteDeployment(@NotNull ExtensionsV1beta1Deployment deployment) {
-        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+    private void deleteDeployment(@NotNull V1Deployment deployment) {
+        var v1Api = getAppsV1Api();
         try {
-            extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, null);
+            v1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             checkApiError(e, "deployment");
         } catch (JsonSyntaxException e) {
@@ -561,10 +560,10 @@ public class K8sClient {
     }
 
     @NotNull
-    private ExtensionsV1beta1Api getExtensionsV1beta1Api() {
-        var extensionsV1beta1Api = new ExtensionsV1beta1Api();
-        extensionsV1beta1Api.setApiClient(api.getApiClient());
-        return extensionsV1beta1Api;
+    private AppsV1Api getAppsV1Api() {
+        var apiv1 = new AppsV1Api();
+        apiv1.setApiClient(api.getApiClient());
+        return apiv1;
     }
 
     @NotNull
@@ -582,10 +581,10 @@ public class K8sClient {
         }
     }
 
-    private void createDeployment(ExtensionsV1beta1Deployment deployment) {
-        ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
+    private void createDeployment(V1Deployment deployment) {
+        var v1api = getAppsV1Api();
         try {
-            extensionsV1beta1Api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, "true", null, null);
+            v1api.createNamespacedDeployment(deployment.getMetadata().getNamespace(), deployment, "true", null, null);
         } catch (ApiException e) {
             retry(deployment, this::createDeployment, e);
         }
@@ -749,14 +748,14 @@ public class K8sClient {
     }
 
     @NotNull
-    private ExtensionsV1beta1Deployment getDeployment(@NotNull AutoCD autoCD) {
+    private V1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
         meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName));
         var labels = Map.of("k8s-app", getK8sApp(autoCD));
         meta.setLabels(labels);
 
-        var spec = new ExtensionsV1beta1DeploymentSpec();
+        var spec = new V1DeploymentSpec();
         spec.setReplicas(autoCD.getReplicas());
         var select = new V1LabelSelector();
         select.setMatchLabels(labels);
@@ -827,7 +826,7 @@ public class K8sClient {
         secret.setName("gitlab-bot");
         podSpec.setImagePullSecrets(List.of(secret));
 
-        var dep = new ExtensionsV1beta1Deployment();
+        var dep = new V1Deployment();
         dep.setMetadata(meta);
         dep.setSpec(spec);
         dep.setKind("Deployment");
