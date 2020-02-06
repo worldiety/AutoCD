@@ -11,55 +11,55 @@ import de.worldiety.autocd.persistence.Volume;
 import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.apis.ExtensionsV1beta1Api;
-import io.kubernetes.client.apis.NetworkingV1beta1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.custom.V1Patch;
-import io.kubernetes.client.models.ExtensionsV1beta1Deployment;
-import io.kubernetes.client.models.ExtensionsV1beta1DeploymentSpec;
-import io.kubernetes.client.models.NetworkingV1beta1HTTPIngressPathBuilder;
-import io.kubernetes.client.models.NetworkingV1beta1HTTPIngressRuleValueBuilder;
-import io.kubernetes.client.models.NetworkingV1beta1Ingress;
-import io.kubernetes.client.models.NetworkingV1beta1IngressBackendBuilder;
-import io.kubernetes.client.models.NetworkingV1beta1IngressRuleBuilder;
-import io.kubernetes.client.models.NetworkingV1beta1IngressSpecBuilder;
-import io.kubernetes.client.models.NetworkingV1beta1IngressTLSBuilder;
-import io.kubernetes.client.models.V1Container;
-import io.kubernetes.client.models.V1ContainerBuilder;
-import io.kubernetes.client.models.V1ContainerPort;
-import io.kubernetes.client.models.V1EnvVar;
-import io.kubernetes.client.models.V1EnvVarBuilder;
-import io.kubernetes.client.models.V1LabelSelector;
-import io.kubernetes.client.models.V1LimitRange;
-import io.kubernetes.client.models.V1LimitRangeItem;
-import io.kubernetes.client.models.V1LimitRangeSpec;
-import io.kubernetes.client.models.V1LocalObjectReference;
-import io.kubernetes.client.models.V1Namespace;
-import io.kubernetes.client.models.V1ObjectMeta;
-import io.kubernetes.client.models.V1ObjectMetaBuilder;
-import io.kubernetes.client.models.V1PersistentVolume;
-import io.kubernetes.client.models.V1PersistentVolumeClaim;
-import io.kubernetes.client.models.V1PersistentVolumeClaimSpec;
-import io.kubernetes.client.models.V1PersistentVolumeClaimSpecBuilder;
-import io.kubernetes.client.models.V1PersistentVolumeClaimVolumeSource;
-import io.kubernetes.client.models.V1PersistentVolumeList;
-import io.kubernetes.client.models.V1PodSpec;
-import io.kubernetes.client.models.V1PodTemplateSpec;
-import io.kubernetes.client.models.V1ResourceRequirementsBuilder;
-import io.kubernetes.client.models.V1SecretBuilder;
-import io.kubernetes.client.models.V1Service;
-import io.kubernetes.client.models.V1ServicePort;
-import io.kubernetes.client.models.V1ServiceSpec;
-import io.kubernetes.client.models.V1StatefulSet;
-import io.kubernetes.client.models.V1StatefulSetSpec;
-import io.kubernetes.client.models.V1Volume;
-import io.kubernetes.client.models.V1VolumeBuilder;
-import io.kubernetes.client.models.V1VolumeMount;
-import io.kubernetes.client.models.V1VolumeMountBuilder;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.ExtensionsV1beta1Api;
+import io.kubernetes.client.openapi.apis.NetworkingV1beta1Api;
+import io.kubernetes.client.openapi.models.ExtensionsV1beta1Deployment;
+import io.kubernetes.client.openapi.models.ExtensionsV1beta1DeploymentSpec;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1HTTPIngressPathBuilder;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1HTTPIngressRuleValueBuilder;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1Ingress;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1IngressBackendBuilder;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1IngressRuleBuilder;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1IngressSpecBuilder;
+import io.kubernetes.client.openapi.models.NetworkingV1beta1IngressTLSBuilder;
+import io.kubernetes.client.openapi.models.V1Container;
+import io.kubernetes.client.openapi.models.V1ContainerBuilder;
+import io.kubernetes.client.openapi.models.V1ContainerPort;
+import io.kubernetes.client.openapi.models.V1EnvVar;
+import io.kubernetes.client.openapi.models.V1EnvVarBuilder;
+import io.kubernetes.client.openapi.models.V1LabelSelector;
+import io.kubernetes.client.openapi.models.V1LimitRange;
+import io.kubernetes.client.openapi.models.V1LimitRangeItem;
+import io.kubernetes.client.openapi.models.V1LimitRangeSpec;
+import io.kubernetes.client.openapi.models.V1LocalObjectReference;
+import io.kubernetes.client.openapi.models.V1Namespace;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMetaBuilder;
+import io.kubernetes.client.openapi.models.V1PersistentVolume;
+import io.kubernetes.client.openapi.models.V1PersistentVolumeClaim;
+import io.kubernetes.client.openapi.models.V1PersistentVolumeClaimSpec;
+import io.kubernetes.client.openapi.models.V1PersistentVolumeClaimSpecBuilder;
+import io.kubernetes.client.openapi.models.V1PersistentVolumeClaimVolumeSource;
+import io.kubernetes.client.openapi.models.V1PersistentVolumeList;
+import io.kubernetes.client.openapi.models.V1PodSpec;
+import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
+import io.kubernetes.client.openapi.models.V1ResourceRequirementsBuilder;
+import io.kubernetes.client.openapi.models.V1SecretBuilder;
+import io.kubernetes.client.openapi.models.V1Service;
+import io.kubernetes.client.openapi.models.V1ServicePort;
+import io.kubernetes.client.openapi.models.V1ServiceSpec;
+import io.kubernetes.client.openapi.models.V1StatefulSet;
+import io.kubernetes.client.openapi.models.V1StatefulSetSpec;
+import io.kubernetes.client.openapi.models.V1Volume;
+import io.kubernetes.client.openapi.models.V1VolumeBuilder;
+import io.kubernetes.client.openapi.models.V1VolumeMount;
+import io.kubernetes.client.openapi.models.V1VolumeMountBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -147,7 +147,7 @@ public class K8sClient {
         var appsV1Api = new AppsV1Api();
         appsV1Api.setApiClient(api.getApiClient());
         try {
-            appsV1Api.deleteNamespacedStatefulSet(set.getMetadata().getName(), set.getMetadata().getNamespace(), "true", null, null, null, null, FOREGROUND);
+            appsV1Api.deleteNamespacedStatefulSet(set.getMetadata().getName(), set.getMetadata().getNamespace(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             log.warn("Could not delete deployment", e);
         } catch (JsonSyntaxException e) {
@@ -323,7 +323,7 @@ public class K8sClient {
     @SuppressWarnings("unused")
     private void deleteNamespace(@NotNull V1Namespace namespace) {
         try {
-            api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, FOREGROUND);
+            api.deleteNamespace(namespace.getMetadata().getName(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             checkApiError(e, "namespace");
         } catch (JsonSyntaxException e) {
@@ -341,7 +341,7 @@ public class K8sClient {
 
     private void applyDeleteClaim(@NotNull V1PersistentVolumeClaim claim) {
         try {
-            api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
+            api.deleteNamespacedPersistentVolumeClaim(claim.getMetadata().getName(), claim.getMetadata().getNamespace(), null, null, null, null, null, null);
             log.info("Deleted claim: " + claim.getMetadata().getName());
         } catch (ApiException e) {
             retry(claim, this::applyDeleteClaim, e);
@@ -363,7 +363,7 @@ public class K8sClient {
     private void deleteDeployment(@NotNull ExtensionsV1beta1Deployment deployment) {
         ExtensionsV1beta1Api extensionsV1beta1Api = getExtensionsV1beta1Api();
         try {
-            extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, FOREGROUND);
+            extensionsV1beta1Api.deleteNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), "true", null, null, null, null, null);
         } catch (ApiException e) {
             checkApiError(e, "deployment");
         } catch (JsonSyntaxException e) {
@@ -373,7 +373,7 @@ public class K8sClient {
 
     private void deleteService(@NotNull V1Service service) {
         try {
-            api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
+            api.deleteNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), null, null, null, null, null, null);
         } catch (ApiException e) {
             checkApiError(e, "service");
         } catch (JsonSyntaxException e) {
@@ -384,7 +384,7 @@ public class K8sClient {
     private void deleteIngress(@NotNull NetworkingV1beta1Ingress ingress) {
         var extensionsV1beta1Api = getNetworkingV1beta1Api();
         try {
-            extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, FOREGROUND);
+            extensionsV1beta1Api.deleteNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), null, null, null, null, null, null);
         } catch (ApiException e) {
             checkApiError(e, "ingress");
         } catch (JsonSyntaxException e) {
@@ -437,7 +437,7 @@ public class K8sClient {
     private void unprotectPVS(AutoCD autoCD) {
         V1PersistentVolumeList pvs;
         try {
-            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
+            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null, null);
             List<String> namesToProtect = getNamesToProtect(autoCD);
 
             pvs.getItems().forEach(pv -> {
@@ -491,7 +491,7 @@ public class K8sClient {
         V1PersistentVolumeList pvs;
         var strings = new ArrayList<String>();
         try {
-            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null);
+            pvs = api.listPersistentVolume(null, null, null, null, null, null, null, null, null);
             List<String> namesToProtect = getNamesToProtect(autoCD);
 
             pvs.getItems().forEach(pv -> {
@@ -531,8 +531,8 @@ public class K8sClient {
      */
     private void cleanupPVC(String namespace, List<V1PersistentVolumeClaim> claims) {
         try {
-            var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, "true", null, null, null, null, null, null, null);
-            var pods = api.listNamespacedPod(namespace, "true", null, null, null, null, null, null, null);
+            var pvcs = api.listNamespacedPersistentVolumeClaim(namespace, "true", null, null, null, null, null, null, null, null);
+            var pods = api.listNamespacedPod(namespace, "true", null, null, null, null, null, null, null, null);
             var validPVCNames = pods.getItems()
                     .stream()
                     .filter(pod -> pod.getSpec().getVolumes().size() > 0)
@@ -637,7 +637,7 @@ public class K8sClient {
     private List<NetworkingV1beta1Ingress> getIngress(@NotNull AutoCD autoCD) {
         var extensionsV1beta1Api = getNetworkingV1beta1Api();
         try {
-            var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null);
+            var ingresses = extensionsV1beta1Api.listIngressForAllNamespaces(null, null, null, null, null, null, null, null, null);
             var ingressWithHostAlreadyPresent = ingresses.getItems()
                     .stream()
                     .filter(it -> !it.getMetadata().getNamespace().equals(getNamespaceString()))
@@ -1052,4 +1052,3 @@ public class K8sClient {
         return v1LimitRange;
     }
 }
-

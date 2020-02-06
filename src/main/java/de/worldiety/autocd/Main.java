@@ -9,10 +9,10 @@ import de.worldiety.autocd.util.DockerconfigBuilder;
 import de.worldiety.autocd.util.Environment;
 import de.worldiety.autocd.util.FileType;
 import de.worldiety.autocd.util.Util;
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.Configuration;
-import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.V1Patch;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.credentials.AccessTokenAuthentication;
@@ -42,6 +42,7 @@ public class Main {
         String name = "autocd.json";
         var autoCD = getAutoCD(name, true);
         var oldAutoCD = getAutoCD("oldautocd.json", false);
+
         // A new API Client is created. Docker Credentials will be obtained from the Digital Oceans cluster configuration file
         ApiClient strategicMergePatchClient = ClientBuilder.standard()
                 .setBasePath(args[0])
