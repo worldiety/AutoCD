@@ -11,7 +11,7 @@ we created AutoCD.
 
 AutoCD helps you to get your project ready for your k8s cluster.
 The program will automatically generate a fitting docker image and deploy
-that to your cluster. Therefor AutoCD detects the project language
+that to your cluster. To do this AutoCD detects the project language
 (Java 8+, Go, Vue.js, Node.js are supported) and uses the matching,
 predefined docker image (if there is none found within your root folder),
 to deploy the project to your cluster. It can also take down old, not used

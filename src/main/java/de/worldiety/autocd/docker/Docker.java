@@ -49,11 +49,13 @@ public class Docker {
 
         log.info("creating image with tag " + tag);
 
+        log.info("Building Docker image");
+
         BuildImageResultCallback callback = new BuildImageResultCallback() {
             @Override
             public void onNext(@NotNull BuildResponseItem item) {
                 if (item.getStream() != null && !item.getStream().equals(".")) {
-                    log.info(item.getStream());
+                    System.out.println(item.getStream());
                 }
                 super.onNext(item);
             }
@@ -77,7 +79,7 @@ public class Docker {
                 @Override
                 public void onNext(PushResponseItem item) {
                     if (item.getStream() != null && !item.getStream().equals(".")) {
-                        log.info(item.getStream());
+                        System.out.println(item.getStream());
                     }
                     super.onNext(item);
                 }

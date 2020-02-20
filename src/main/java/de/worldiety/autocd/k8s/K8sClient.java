@@ -49,6 +49,7 @@ import io.kubernetes.client.openapi.models.V1PersistentVolumeList;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
 import io.kubernetes.client.openapi.models.V1ResourceRequirementsBuilder;
+import io.kubernetes.client.openapi.models.V1Secret;
 import io.kubernetes.client.openapi.models.V1SecretBuilder;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.openapi.models.V1ServicePort;
@@ -64,8 +65,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -101,9 +104,11 @@ public class K8sClient {
     public void deployToK8s(AutoCD autoCD) {
         if (autoCD.getReplicas() > 1 && autoCD.getVolumes().size() != 0) {
             this.removeDeploymentFromK8s(autoCD);
+            System.out.println("\n");
             log.info("Deploying statefulset");
             deployStateful(autoCD);
         } else {
+            System.out.println("\n");
             log.info("Deploying deployment");
             deploy(autoCD);
         }
@@ -313,6 +318,16 @@ public class K8sClient {
                 .build();
 
         try {
+            var secrets = api.listNamespacedSecret(secret.getMetadata().getNamespace(), "true", null, null, null, null, null, null, null, null);
+            if (secrets.getItems()
+                    .stream()
+                    .map(V1Secret::getMetadata)
+                    .filter(Objects::nonNull)
+                    .map(V1ObjectMeta::getName)
+                    .filter(Objects::nonNull)
+                    .anyMatch(it -> it.equals(secret.getMetadata().getName()))) {
+                return;
+            }
             api.createNamespacedSecret(secret.getMetadata().getNamespace(), secret, "true", null, null);
         } catch (ApiException e) {
             log.error("Could not create secret", e);
@@ -987,6 +1002,12 @@ public class K8sClient {
             if (resp.getMessage().contains("already exists")) {
                 return;
             }
+        }
+
+        if (ExceptionUtils.getStackTrace(e).contains("already exists") ||
+                e.getResponseBody().contains("AlreadyExists") ||
+                e.getResponseBody().contains("NotFound")) {
+            return;
         }
 
         log.error("Unknown error", e);

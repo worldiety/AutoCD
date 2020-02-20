@@ -113,8 +113,12 @@ public class Main {
             return;
         }
 
-        deployWithDependencies(autoCD, k8sClient, buildType);
-        log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomains());
+        if (!autoCD.isDockerOnly()) {
+            deployWithDependencies(autoCD, k8sClient, buildType);
+            log.info("Deployed to k8s with subdomain: " + autoCD.getSubdomains());
+        } else {
+            log.info("Done.");
+        }
     }
 
     /**
@@ -143,6 +147,7 @@ public class Main {
             var dockerFile = new File("Dockerfile");
 
             if (!dockerFile.exists()) {
+                log.info("Using Dockerfile provided by AutoCD");
                 finder.findDockerConfig().ifPresent(config -> {
                     Util.pushDockerAndSetPath(config, autoCD, buildType);
                 });
@@ -177,7 +182,8 @@ public class Main {
      * matching build type.
      * If autoCD does not have any subdomains, this method will build one out of the build type and an hashed version
      * of the registry image path.
-     *  @param autoCD
+     *
+     * @param autoCD
      * @param buildType
      * @param subdomains
      */

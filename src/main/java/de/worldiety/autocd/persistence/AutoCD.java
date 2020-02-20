@@ -12,6 +12,7 @@ public class AutoCD {
     private int containerPort = 8080;
     private int servicePort = 80;
     private int replicas = 1;
+    private boolean dockerOnly = false;
     private boolean publiclyAccessible = true;
     private long terminationGracePeriod = 60L;
     private String dockerImagePath;
@@ -79,6 +80,14 @@ public class AutoCD {
             default:
                 return defaultResources;
         }
+    }
+
+    public boolean isDockerOnly() {
+        return dockerOnly;
+    }
+
+    public void setDockerOnly(boolean dockerOnly) {
+        this.dockerOnly = dockerOnly;
     }
 
     public int getReplicas() {
