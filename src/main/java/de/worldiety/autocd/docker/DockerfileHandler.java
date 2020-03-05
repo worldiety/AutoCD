@@ -1,5 +1,6 @@
 package de.worldiety.autocd.docker;
 
+import de.worldiety.autocd.persistence.AutoCD;
 import de.worldiety.autocd.util.FileType;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -16,8 +17,11 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DockerfileHandler {
+    private static final Logger log = LoggerFactory.getLogger(DockerfileHandler.class);
     private List<File> fileList = new ArrayList<>();
 
     public DockerfileHandler(String path) {
@@ -139,7 +143,7 @@ public class DockerfileHandler {
      *
      * @return File
      */
-    public Optional<File> findDockerConfig() {
+    public Optional<File> findDockerConfig(AutoCD autoCD, String buildType) {
         var opt = fileList.stream()
                 .map(this::getFileExt)
                 .map(this::mapFileTypeToFileType)
@@ -155,6 +159,28 @@ public class DockerfileHandler {
 
                 IOUtils.copy(getFileFromResources(ftype.getDockerConfig()), fout);
                 fout.flush();
+
+                var bwout = new BufferedWriter(new OutputStreamWriter(fout));
+
+                autoCD.getBuildVariables().get(buildType).forEach((k, v) -> {
+                    if (v.startsWith("${")) {
+                        v = v.substring(2, v.length() - 1);
+                        var initial = v;
+                        v = System.getenv(v);
+
+                        if (v == null) {
+                            log.warn("Unable to resolve environment variable: " + initial);
+                        }
+                    }
+
+                    try {
+                        System.out.println("setting: " + "ENV " + k + " " + v + "\n");
+                        bwout.write("ENV " + k + " " + v + "\n");
+                        bwout.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
 
                 if (customBuildsh.exists()) {
                     IOUtils.copy(getFileFromResources("run-build-part"), fout);

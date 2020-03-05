@@ -26,6 +26,7 @@ public class AutoCD {
     private String serviceName = null;
     private List<String> subdomains = new ArrayList<>();
     private Resources resources = null;
+    private Map<String, Map<String, String>> buildVariables = new HashMap<>();
 
     public AutoCD() {
     }
@@ -80,6 +81,14 @@ public class AutoCD {
             default:
                 return defaultResources;
         }
+    }
+
+    public Map<String, Map<String, String>> getBuildVariables() {
+        return buildVariables;
+    }
+
+    public void setBuildVariables(Map<String, Map<String, String>> buildVariables) {
+        this.buildVariables = buildVariables;
     }
 
     public boolean isDockerOnly() {

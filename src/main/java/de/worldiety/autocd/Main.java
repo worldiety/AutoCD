@@ -148,7 +148,7 @@ public class Main {
 
             if (!dockerFile.exists()) {
                 log.info("Using Dockerfile provided by AutoCD");
-                finder.findDockerConfig().ifPresent(config -> {
+                finder.findDockerConfig(autoCD, buildType).ifPresent(config -> {
                     Util.pushDockerAndSetPath(config, autoCD, buildType);
                 });
             } else {
