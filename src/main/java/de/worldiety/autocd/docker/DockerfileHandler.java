@@ -162,25 +162,27 @@ public class DockerfileHandler {
 
                 var bwout = new BufferedWriter(new OutputStreamWriter(fout));
 
-                autoCD.getBuildVariables().get(buildType).forEach((k, v) -> {
-                    if (v.startsWith("${")) {
-                        v = v.substring(2, v.length() - 1);
-                        var initial = v;
-                        v = System.getenv(v);
+                if(autoCD.getBuildVariables().containsKey(buildType)) {
+                    autoCD.getBuildVariables().get(buildType).forEach((k, v) -> {
+                        if (v.startsWith("${")) {
+                            v = v.substring(2, v.length() - 1);
+                            var initial = v;
+                            v = System.getenv(v);
 
-                        if (v == null) {
-                            log.warn("Unable to resolve environment variable: " + initial);
+                            if (v == null) {
+                                log.warn("Unable to resolve environment variable: " + initial);
+                            }
                         }
-                    }
 
-                    try {
-                        System.out.println("setting: " + "ENV " + k + " " + v + "\n");
-                        bwout.write("ENV " + k + " " + v + "\n");
-                        bwout.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
+                        try {
+                            System.out.println("setting: " + "ENV " + k + " " + v + "\n");
+                            bwout.write("ENV " + k + " " + v + "\n");
+                            bwout.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
 
                 if (customBuildsh.exists()) {
                     IOUtils.copy(getFileFromResources("run-build-part"), fout);
