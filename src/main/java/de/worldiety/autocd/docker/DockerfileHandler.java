@@ -162,7 +162,7 @@ public class DockerfileHandler {
 
                 var bwout = new BufferedWriter(new OutputStreamWriter(fout));
 
-                if(autoCD.getBuildVariables().containsKey(buildType)) {
+                if (autoCD.getBuildVariables().containsKey(buildType)) {
                     autoCD.getBuildVariables().get(buildType).forEach((k, v) -> {
                         if (v.startsWith("${")) {
                             v = v.substring(2, v.length() - 1);
