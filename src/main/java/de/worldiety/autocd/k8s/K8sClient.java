@@ -162,7 +162,7 @@ public class K8sClient {
     private V1StatefulSet getStatefulSet(AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
-        meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName).substring(0, 20));
+        meta.setName(Util.slugify(projName + "--" + autoCD.getServiceName()));
         var labels = Map.of("k8s-app", getK8sApp(autoCD), "serviceName", getCleanServiceNameLabel(autoCD));
         meta.setLabels(labels);
 
@@ -624,6 +624,10 @@ public class K8sClient {
 
     @NotNull
     private String getPVCName(Volume volume, @NotNull AutoCD autoCD) {
+        // TODO: we should switch to an unhashed version for readability reasons - what is the best way to migrate the old porjects?
+        //var str = getNamespaceString() + "--" + getServiceName(autoCD) + "--" + "claim" + autoCD.getVolumes().indexOf(volume);
+        //return Util.slugify(str);
+
         var str = getNamespaceString() + "-" + getName() + "-" + autoCD.getIdentifierRegistryImagePath() + "-" + autoCD.getVolumes().indexOf(volume) + "-claim";
         return hash(str).substring(0, 20);
     }
@@ -675,7 +679,7 @@ public class K8sClient {
             var ingress = new NetworkingV1beta1Ingress();
             ingress.setKind("Ingress");
             var meta = getNamespacedMeta();
-            meta.setName(Util.hash(subdomain + getNamespaceString() + "-" + getName() + "-ingress" + autoCD.getIdentifierRegistryImagePath()).substring(0, 20));
+            meta.setName(Util.slugify(getNamespaceString() + "--" + subdomain + "--" + getName()));
             meta.setAnnotations(Map.of("cert-manager.io/cluster-issuer", "letsencrypt-prod",
                     "kubernetes.io/ingress.class", "nginx", "nginx.ingress.kubernetes.io/proxy-body-size", "1024m"));
 
@@ -695,7 +699,7 @@ public class K8sClient {
                     .withRules(rules.build())
                     .withTls(new NetworkingV1beta1IngressTLSBuilder()
                             .withHosts(subdomain)
-                            .withSecretName(Util.hash(subdomain).substring(0, 10))
+                            .withSecretName(Util.slugify(getNamespaceString() + "--" + subdomain))
                             .build())
                     .build();
 
@@ -739,7 +743,14 @@ public class K8sClient {
             return autoCD.getServiceName();
         }
 
-        return "service-" + Util.hash(getNamespaceString() + "-" + getName() + "-service").substring(0, 20);
+        String serviceName = "service--" + getName();
+
+        // Validate the length of the new service name - should be less then 63 characters:
+        // https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/discovery/types.go#L122-L130
+        if (serviceName.length() > 63) {
+            throw new IllegalArgumentException("The service name MUST NOT have more then 63 characters!");
+        }
+        return serviceName;
     }
 
     @NotNull
@@ -766,7 +777,7 @@ public class K8sClient {
     private V1Deployment getDeployment(@NotNull AutoCD autoCD) {
         var meta = getNamespacedMeta();
         var projName = System.getenv(Environment.CI_PROJECT_NAME.toString());
-        meta.setName(Util.hash(getNamespaceString() + autoCD.getIdentifierRegistryImagePath() + projName));
+        meta.setName(Util.slugify(projName + "--" + autoCD.getServiceName()));
         var labels = Map.of("k8s-app", getK8sApp(autoCD));
         meta.setLabels(labels);
 
@@ -882,7 +893,7 @@ public class K8sClient {
 
     @NotNull
     private String getK8sApp(@NotNull AutoCD autoCD) {
-        return Util.hash(getNamespaceString() + "-" + getName() + "-" + Util.hash(autoCD.getIdentifierRegistryImagePath())).substring(0, 20) + hyphenedBuildType;
+        return Util.slugify(getNamespaceString() + "-" + autoCD.getServiceName());
     }
 
     /**

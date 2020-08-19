@@ -219,16 +219,14 @@ public class Main {
     }
 
     /**
-     * Creates a name for a depending service out of the project name and a hashed registry image path from the main service
+     * Creates a name for a depending service
      *
      * @param main
      * @param other
      */
     private static void setServiceNameForOtherImages(AutoCD main, AutoCD other) {
         if (other.getServiceName() == null) {
-            other.setServiceName(Util.hash(
-                    System.getenv(Environment.CI_PROJECT_NAME.toString()) + main.getIdentifierRegistryImagePath()).substring(0, 20)
-            );
+            other.setServiceName(Util.slugify(main.getServiceName() + "-" + main.getIdentifierRegistryImagePath()));
         }
     }
 
