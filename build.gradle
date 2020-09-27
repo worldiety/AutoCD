@@ -62,7 +62,7 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains/annotations
     compile group: 'org.jetbrains', name: 'annotations', version: '17.0.0'
     // https://mvnrepository.com/artifact/com.github.docker-java/docker-java
-    compile group: 'com.puppycrawl.tools', name: 'checkstyle', version: '8.22'
+    compile group: 'com.puppycrawl.tools', name: 'checkstyle', version: '8.36.2'
     compile group: 'com.github.docker-java', name: 'docker-java', version: '3.1.5'
     compile group: 'javax.activation', name: 'activation', version: '1.1.1'
     compile group: 'com.sun.mail', name: 'javax.mail', version: '1.6.2'
